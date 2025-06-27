@@ -30,8 +30,8 @@ class Instance:
     vin_t: Optional[List[float]]  # List of min areas, len == len(T)
     K_t: Optional[List[float]]  # List of fleet availabilities, len == len(T)
     V_J: Optional[Set[Any]]  # Set of irrigable block indices, subset of B
-    Bl_l: Optional[Dict[Any, Set[Any]]]  # Dict with keys in F, values are sets of indices from B
-    Bs_t: Optional[Dict[Any, Set[Any]]]  # Dict with keys in T, values are sets of indices from B
+    Bl_j: Optional[Dict[Any, Set[Any]]]  # Dict with keys in F, values are sets of indices from B
+    Bs_j: Optional[Dict[Any, Set[Any]]]  # Dict with keys in T, values are sets of indices from B
     st_ij: Optional[np.ndarray]  # Travel times, shape (len(B), len(B))
     dist_ij: Optional[np.ndarray]  # Distances, shape (len(B), len(B))
     ATR_jt: Optional[np.ndarray]  # Sucrose per ton, shape (len(B), len(T))
@@ -68,8 +68,8 @@ class Instance:
         self.vin_t = kwargs.get('vin_t', None)
         self.K_t = kwargs.get('K_t', None)
         self.V_J = kwargs.get('V_J', None)
-        self.Bl_l = kwargs.get('Bl_l', None)
-        self.Bs_t = kwargs.get('Bs_t', None)
+        self.Bl_j = kwargs.get('Bl_j', None)
+        self.Bs_j = kwargs.get('Bs_j', None)
         self.st_ij = kwargs.get('st_ij', None)
         self.dist_ij = kwargs.get('dist_ij', None)
         self.ATR_jt = kwargs.get('ATR_jt', None)
@@ -115,13 +115,13 @@ class Instance:
             end_j = start_j + window_length_j - 1
             harvest_window_j[j] = (start_j, end_j)
 
-        # Generate Bs_t based on harvesting windows
-        self.Bs_t = {t: {j for j in self.B if harvest_window_j[j][0] <= t <= harvest_window_j[j][1]} for t in self.T}
+        # Generate Bs_j based on harvesting windows
+        self.Bs_j = {t: {j for j in self.B if harvest_window_j[j][0] <= t <= harvest_window_j[j][1]} for t in self.T}
 
         # Microperiods
         microperiods_per_t = kwargs.get('microperiods_per_t', 3)
-        self.S_t = {t: list(range(1, microperiods_per_t + 1)) for t in self.T}
-        self.SO_t = {t: 1 for t in self.T} # type: ignore
+        self.S_t = {t: [s + self.N * (t - 1) for s in range(1, self.N + 1)] for t in self.T}
+        self.SO_t = {t: [self.S_t[t][0]] for t in self.T} # type: ignore
 
         # Normal distributions
         self.p_j = np.random.normal(
@@ -215,8 +215,8 @@ class Instance:
 
         # Sets
         self.V_J = {j for j, fi in zip(self.B, self.fi_j) if fi > 0.5} # type: ignore
-        self.Bl_l = {l: set(random.sample(self.B, k=random.randint(1, size_B))) for l in self.F}
-        self.Bs_t = {t: set(random.sample(self.B, k=random.randint(1, size_B))) for t in self.T}
+        self.Bl_j = {l: set(random.sample(self.B, k=random.randint(1, size_B))) for l in self.F}
+        self.Bs_j = {t: set(random.sample(self.B, k=random.randint(1, size_B))) for t in self.T}
 
         # Fixed values
         self.Ht = kwargs.get('Ht', 8.0)

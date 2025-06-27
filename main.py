@@ -15,12 +15,11 @@ import plotly.express as px
 import random
 import pickle
 from datetime import datetime
-
+from model import GLSP_model
 
 inst = Instance("Teste1")
 inst.generate(30,10,12)
-inst.visualize_instance()
-inst.save()
 
-
+model = GLSP_model(inst)
+model.solve()
 
