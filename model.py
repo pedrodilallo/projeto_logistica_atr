@@ -181,7 +181,7 @@ class GLSP_model():
 
         self.model = model
     
-    def solve(self,TimeLim: float,MemLim: float):
+    def solve(self,TimeLim: float = 600 ,MemLim: float = 13.2):
         
         self.model.write('debug.lp',io_options={'symbolic_solver_labels': True})
         solver = pyo.SolverFactory('gurobi_persistent')

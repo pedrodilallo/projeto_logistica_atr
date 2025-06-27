@@ -127,7 +127,9 @@ class Instance:
         coord_min = kwargs.get('coord_min', -100.0) 
         coord_max = kwargs.get('coord_max', 100.0) 
         coords = np.random.uniform(coord_min, coord_max, size=(size_B, 2))  # Shape: (size_B, 2)
-
+        
+        self.coords = coords
+        
         diff = coords[:, np.newaxis, :] - coords[np.newaxis, :, :]  # Shape: (size_B, size_B, 2)
         self.dist_ij = np.sqrt(np.sum(diff ** 2, axis=2))  # Shape: (size_B, size_B)
         np.fill_diagonal(self.dist_ij, 0)  # type: ignore # Set diagonal to 0 (distance to self)
@@ -212,7 +214,4 @@ class Instance:
 
 
     def to_txt(self): 
-        pass
-
-    def to_csvs(self): 
         pass
