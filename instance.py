@@ -13,6 +13,7 @@ class Instance:
     """
 
     # Type hints for all attributes
+    name: str
     B: Optional[List[Any]]  # List of harvest block indices
     F: Optional[List[Any]]  # List of harvest front indices
     T: Optional[List[Any]]  # List of macroperiod indices
@@ -45,11 +46,12 @@ class Instance:
     S_t: Optional[Dict[int, List[int]]] = None
     SO_t: Optional[Dict[int, List[int]]] = None
 
-    def __init__(self, **kwargs):
+    def __init__(self,name, **kwargs):
         """
         Initialize the Instance with optional keyword arguments.
         Any unspecified attributes will default to None.
         """
+        self.Name = name
         self.B = kwargs.get('B', None)
         self.F = kwargs.get('F', None)
         self.T = kwargs.get('T', None)

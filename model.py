@@ -4,7 +4,7 @@ from pyomo.environ import *
 from pyomo.opt import SolverFactory
 import numpy as np
 
-class model():
+class GLSP_model():
 
     def __init__(self,instance) -> None:
         self.instance = instance
@@ -180,4 +180,31 @@ class model():
                         model.idle_micro_period_list.add(expr=(y[l,j,s-1] >= y[l,j,s]))
 
         self.model = model
+    
+    def solve(self,TimeLim: float,MemLim: float):
         
+        self.model.write('debug.lp',io_options={'symbolic_solver_labels': True})
+        solver = pyo.SolverFactory('gurobi_persistent')
+        solver.options['TimeLimit'] = TimeLim  
+        solver.options['SoftMemLimit'] = MemLim
+        solver.set_instance(self.model) 
+        results = solver.solve(self.model, tee=True, load_solutions = False,logfile=f'log_gurobi_{self.instance.Name}.txt')
+        
+        if solver._solver_model.Status == 17:  # Memory limit reached (pyomo does not handle this)
+            results.solver.termination_condition = TerminationCondition.resourceInterrupt
+            results.solver.status = SolverStatus.warning
+
+        self.model.solutions.load_from(results)
+
+        grb = solver._solver_model
+        stats = {
+                'objective_value': grb.ObjVal if grb.SolCount > 0 else None,
+                'termination_condition': str(results.solver.termination_condition),
+                'number_of_variables': self.model.nvariables(),
+                'number_of_constraints': self.model.nconstraints(),
+                'mip_gap': grb.MIPGap if hasattr(grb, 'MIPGap') else None,
+                'runtime': grb.Runtime,
+                'best_bound': grb.ObjBound,
+                'node_count': results.solver.statistics.get('branch_and_bound', {}).get('nodes', None),}
+        
+        return (results,stats)
