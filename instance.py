@@ -4,6 +4,8 @@ from scipy.stats import poisson
 import numpy as np
 import pickle
 from datetime import datetime
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 class Instance:
@@ -81,9 +83,14 @@ class Instance:
         self.pa = kwargs.get('pa', None)
         self.bm_lj = kwargs.get('bm_lj', None)
         self.N = kwargs.get('microperiods_per_t', 22)
-        self.S_t = {t: [s + self.N * (t - 1) for s in range(1, self.N + 1)] for t in self.T} # type: ignore
-        self.SO_t = {t: [self.S_t[t][0]] for t in self.T} # type: ignore
-    
+
+        try: 
+            self.S_t = {t: [s + self.N * (t - 1) for s in range(1, self.N + 1)] for t in self.T} # type: ignore
+            self.SO_t = {t: [self.S_t[t][0]] for t in self.T} # type: ignore
+        except:
+            self.S_t = None
+            self.SO_t =  None
+
     def generate(self, size_B: int, size_F: int, size_T: int, **kwargs):
         """
         Generate an instance based on sizes using random distributions.
@@ -98,6 +105,18 @@ class Instance:
         self.B = list(range(1, size_B + 1))
         self.F = list(range(1, size_F + 1))
         self.T = list(range(1, size_T + 1))
+
+        min_window = kwargs.get('min_window', 1)
+        max_window = kwargs.get('max_window', size_T)
+        harvest_window_j = {}
+        for j in self.B:
+            window_length_j = random.randint(min_window, max_window)
+            start_j = random.randint(1, size_T - window_length_j + 1)
+            end_j = start_j + window_length_j - 1
+            harvest_window_j[j] = (start_j, end_j)
+
+        # Generate Bs_t based on harvesting windows
+        self.Bs_t = {t: {j for j in self.B if harvest_window_j[j][0] <= t <= harvest_window_j[j][1]} for t in self.T}
 
         # Microperiods
         microperiods_per_t = kwargs.get('microperiods_per_t', 3)
@@ -136,11 +155,15 @@ class Instance:
 
         self.st_ij = self.dist_ij/40
 
-        self.ATR_jt = np.random.normal(
-            kwargs.get('ATR_jt_mean', 10), 
-            kwargs.get('ATR_jt_std', 1), 
-            (size_B, size_T)
-        )
+        self.ATR_jt = np.zeros((size_B, size_T))
+        for j in self.B:
+            start_j, end_j = harvest_window_j[j]
+            for t in self.T:
+                if start_j <= t <= end_j:
+                    self.ATR_jt[j-1, t-1] = np.random.normal(
+                        kwargs.get('ATR_jt_mean', 10), 
+                        kwargs.get('ATR_jt_std', 1)
+                    )
 
         # Uniform distributions
         self.col_j = np.random.uniform(
@@ -208,10 +231,78 @@ class Instance:
     def save(self):
         sizes = f"{len(self.B)}_{len(self.F)}_{len(self.T)}" # type: ignore
         current_time = datetime.now().strftime("%Y%m%d%H%M")
-        filename = f"instance_objects/instance_{sizes}_{current_time}.pkl"
+        filename = f"instance_objects/instance_{self.Name}_{sizes}_{current_time}.pkl"
         with open(filename, 'wb') as f:
             pickle.dump(self, f)
 
+    def visualize_instance(self): 
+        print(f"Blocks (B): {self.B}")
+        print(f"Fronts (F): {self.F}")
+        print(f"Periods (T): {self.T}")
+        print(f"Distance Matrix Shape: {self.dist_ij.shape}")
+
+        sns.set(style='whitegrid', font_scale=1.2)
+
+        fig, ax = plt.subplots(figsize=(10, 8))
+        X = self.coords[:, 0]
+        Y = self.coords[:, 1]
+
+        ax.scatter(X, Y, c=self.transp_j, s = [p * 2 for p in self.p_j], cmap='coolwarm', label='Harvest Blocks')
+        ax.scatter(0, 0, c='black', marker='s', s=200, label='Mill')
+
+        # Colorbar for transport capacity
+        scatter = ax.scatter(X, Y, c=self.transp_j, cmap='coolwarm')  
+        fig.colorbar(scatter, ax=ax, label='Transport Capacity (units)')
+
+        ax.set_title('Harvest Blocks with Arrows to Mill')
+        ax.set_xlabel('X Coordinate (km)')
+        ax.set_ylabel('Y Coordinate (km)')
+        ax.legend()
+        ax.axis('equal')
+        plt.show()
+
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(self.dist_ij, cmap='RdYlGn_r', cbar_kws={'label': 'Distance (km)'})
+        plt.title('Distance Matrix Heatmap (Higher = Worse)')
+        plt.xlabel('Block Index')
+        plt.ylabel('Block Index')
+        plt.show()
+
+        fig, axes = plt.subplots(2, 2, figsize=(14/1.4, 14/1.4))
+
+        # Production Bar Chart
+        sns.barplot(x=self.B, y=self.p_j, ax=axes[0, 0], color='blue')
+        axes[0, 0].set_title('Estimated Production')
+        axes[0, 0].set_ylabel('Tons')
+        axes[0, 0].tick_params(axis='x', rotation=45)
+
+        # Productivity Bar Chart
+        sns.barplot(x=self.B, y=self.TCH_j, ax=axes[0, 1], color='green')
+        axes[0, 1].set_title('Productivity')
+        axes[0, 1].set_ylabel('TCH')
+        axes[0, 1].tick_params(axis='x', rotation=45)
+
+        # Irrigable Fraction Bar Chart
+        sns.barplot(x=self.B, y=self.fi_j, ax=axes[1, 0], color='orange')
+        axes[1, 0].set_title('Irrigable Fraction')
+        axes[1, 0].set_ylabel('Fraction')
+        axes[1, 0].set_xlabel('Block Index')
+        axes[1, 0].tick_params(axis='x', rotation=45)
+
+        # Sucrose Content (ATR_jt) Heatmap
+        ATR_nonzero = self.ATR_jt[self.ATR_jt > 0]
+        vmin = ATR_nonzero.min() if ATR_nonzero.size > 0 else 0
+        sns.heatmap(self.ATR_jt, ax=axes[1, 1], cmap='YlOrRd', vmin=vmin, cbar_kws={'label': 'Sucrose Content (ATR)'})
+        axes[1, 1].set_title('Sucrose Content per Block and Period')
+        axes[1, 1].set_xlabel('Period Index')
+        axes[1, 1].set_ylabel('Block Index')
+        axes[1, 1].set_xticks(range(len(self.T)))
+        axes[1, 1].set_xticklabels(self.T, rotation=45)
+        axes[1, 1].set_yticks(range(len(self.B)))
+        axes[1, 1].set_yticklabels(self.B)
+
+        plt.tight_layout()
+        plt.show()
 
     def to_txt(self): 
         pass
