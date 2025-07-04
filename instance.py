@@ -1,6 +1,6 @@
 from typing import Dict, List, Set, Optional, Any
 import random
-from scipy.stats import poisson
+from scipy.stats import poisson,truncnorm
 import numpy as np
 import pickle
 from datetime import datetime
@@ -130,10 +130,10 @@ class Instance:
             size_B
         ).tolist()
 
-        self.TCH_j = np.random.normal(
-            kwargs.get('TCH_j_mean', 50), 
-            kwargs.get('TCH_j_std', 10), 
-            size_B
+        a, b = 0, np.inf  # Truncate below 0
+        mu, sigma = kwargs.get('TCH_j_mean', 50), kwargs.get('TCH_j_std', 10)
+        self.TCH_j = truncnorm.rvs(
+            a=(a - mu) / sigma, b=(b - mu) / sigma, loc=mu, scale=sigma, size=size_B
         ).tolist()
 
         self.mind_t = np.random.normal(
@@ -166,14 +166,16 @@ class Instance:
                     )
 
         # Uniform distributions
+        col_j_min = max(0.1, kwargs.get('col_j_min', 5))
         self.col_j = np.random.uniform(
-            kwargs.get('col_j_min', 5), 
+            col_j_min, 
             kwargs.get('col_j_max', 10), 
             size_B
         ).tolist()
 
+        transp_j_min = max(0.1, kwargs.get('transp_j_min', 10))
         self.transp_j = np.random.uniform(
-            kwargs.get('transp_j_min', 10), 
+            transp_j_min, 
             kwargs.get('transp_j_max', 20), 
             size_B
         ).tolist()
@@ -205,9 +207,9 @@ class Instance:
         }
 
         # Poisson distribution
-        self.Nm_l = poisson.rvs(
+        self.Nm_l =  [max(1, val) for val in poisson.rvs(
             kwargs.get('Nm_l_mean', 5), 
-            size=(size_F,) ).tolist() # type: ignore
+            size=(size_F,) )] # type: ignore
 
         # Derived parameters
         maxd_t_offset = kwargs.get('maxd_t_offset', 100)

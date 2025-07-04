@@ -12,8 +12,11 @@ class GLSP_model():
         self.model.Name = instance.Name + "_model" 
         
         self.build_params()
+        print("Params ok!")
         self.build_vars()
+        print("Vars ok!")
         self.build_model()
+        print("Model was built!")
 
     def build_params(self) -> None:
         instance = self.instance
@@ -27,13 +30,14 @@ class GLSP_model():
         model.S = pyo.RangeSet(1, instance.N * len(instance.T)) # type: ignore
         model.S_t = pyo.Set(model.T, initialize=instance.S_t) # type: ignore
         model.SO_t = pyo.Set(model.T,initialize=instance.SO_t)
-        model.V_J = pyo.Set(initialize=instance.V_J) # type: ignore
+        model.V_J = pyo.Set(initialize=instance.V_J, ordered = False) # type: ignore
         model.Bl_j = pyo.Set(model.F, initialize=instance.Bl_j,ordered = False) # type: ignore
         model.Bs_j = pyo.Set(model.T, initialize=instance.Bs_j,ordered = False) # type: ignore
         
         # Params 
+        model.fi_j = pyo.Param(model.B, initialize={j: instance.fi_j[j-1] for j in model.B}) #type: ignore
         model.p_j = pyo.Param(model.B, initialize={j: instance.p_j[j-1] for j in model.B}) # type: ignore
-        model.f_j = pyo.Param(model.B, initialize={j: instance.f_j[j-1] for j in model.B}) # type: ignore
+        #model.f_j = pyo.Param(model.B, initialize={j: instance.f_j[j-1] for j in model.B}) # type: ignore
         model.TCH_j = pyo.Param(model.B, initialize={j: instance.TCH_j[j-1] for j in model.B}) # type: ignore
         model.col_j = pyo.Param(model.B, initialize={j: instance.col_j[j-1] for j in model.B}) # type: ignore
         model.transp_j = pyo.Param(model.B, initialize={j: instance.transp_j[j-1] for j in model.B}) # type: ignore
@@ -61,8 +65,8 @@ class GLSP_model():
         model = self.model
 
         # Aliases for params
-        B,F,T,S,V_J,S_t,SO_t = model.B, model.F, model.T, model.S, model.V_J,  model.S_t, model.SO_t # type: ignore
-        p_j,Bl_j,Bs_j,f_j,mind_t,maxd_t,vin_t,fi_j,TCH,Nm,col,Ht,Nt,K,transp,st,dist,bm,Htt,Np,mo,bs,md = model.p_j, model.Bl_j, model.Bs_j, model.f_j, model.mind_t, model.maxd_t, model.vin_t, model.fi_j, model.TCH, model.Nm, model.col, model.Ht, model.Nt, model.K, model.transp, model.st, model.dist, model.bm, model.Htt, model.Np, model.mo, model.bs, model.md # type: ignore
+        B, F, T, S, V_J, S_t, SO_t = model.B, model.F, model.T, model.S, model.V_J, model.S_t, model.SO_t
+        p_j, Bl_j, Bs_j,  mind_t, maxd_t, vin_t, fi_j, TCH_j, Nm_l, col_j, Ht, N_t, K_t, transp_j, st_ij, dist_ij, bm_lj, Htt, Np, mo, bs, md = model.p_j, model.Bl_j, model.Bs_j,  model.mind_t, model.maxd_t, model.vin_t, model.fi_j, model.TCH_j, model.Nm_l, model.col_j, model.Ht, model.N_t, model.K_t, model.transp_j, model.st_ij, model.dist_ij, model.bm_lj, model.Htt, model.Np, model.mo, model.bs, model.md
 
         def x_bounds(model,l, j,s):
             return (0, model.p_j[j])
@@ -71,8 +75,8 @@ class GLSP_model():
         model.y = pyo.Var(F, B, S, within=Binary) # type: ignore
         model.z = pyo.Var(F, B, B, S, within=Binary) # type: ignore
 
-        def wm_bounds(model, m, j):
-            return (0, model.mind[m, j])
+        def wm_bounds(model, t):
+            return (0, model.mind_t[t])
         model.wm = Var(T, bounds=wm_bounds) # type: ignore
 
         def wb_bounds(model, j):
@@ -85,23 +89,24 @@ class GLSP_model():
                 for l in F: # type: ignore
                     if not j in set(value for value in Bs_j[t] if value in Bl_j[l]): # type: ignore
                         for s in S_t[t]: # type: ignore
-                            y[l,j,s].fi_jx(0) # type: ignore
+                            model.y[l,j,s].fix(0) # type: ignore
 
-        self.model = model
+        self.model = model 
     
     def build_model(self):
         model = self.model
 
         # Aliases
-        B,  F,  T,  S,  V_J,  S_t,  SO_t = model.B,   model.F,   model.T,   model.S,   model.V_J,    model.S_t,   model.SO_t # type: ignore
-        p_j,  Bl_j,  Bs_j,  f_j,  mind_t,  maxd_t,  vin_t,  fi_j,  TCH,  Nm,  col,  Ht,  Nt,  K,  transp,  st,  dist,  bm,  Htt,  Np,  mo,  bs,  md = model.p_j,   model.Bl_j,   model.Bs_j,   model.f_j,   model.mind_t,   model.maxd_t,   model.vin_t,   model.fi_j,   model.TCH,   model.Nm,   model.col,   model.Ht,   model.Nt,   model.K,   model.transp,   model.st,   model.dist,   model.bm,   model.Htt,   model.Np,   model.mo,   model.bs,   model.md # type: ignore
-        pa, ATR_jt = model.pa,model.ATR_jt
-
-        x,y,z,wm,wb = model.x,model.y,model.z,model.wm,model.wb # type: ignore
+        B, F, T, S, V_J, S_t, SO_t = model.B, model.F, model.T, model.S, model.V_J, model.S_t, model.SO_t
+        p_j, Bl_j, Bs_j, mind_t, maxd_t, vin_t, fi_j, TCH_j, Nm_l, col_j, Ht, N_t, K_t, transp_j, st_ij, dist_ij, bm_lj, Htt, Np, mo, bs, md = model.p_j, model.Bl_j, model.Bs_j, model.mind_t, model.maxd_t, model.vin_t, model.fi_j, model.TCH_j, model.Nm_l, model.col_j, model.Ht, model.N_t, model.K_t, model.transp_j, model.st_ij, model.dist_ij, model.bm_lj, model.Htt, model.Np, model.mo, model.bs, model.md
+        
+        x, y, z, wm, wb = model.x, model.y, model.z, model.wm, model.wb
+        pa, ATR_jt = model.pa, model.ATR_jt
 
         # Objective 
 
-        model.objective = Objective(expr=(mo * sum(wm[t]  for t in T) +bs*sum(wb[j] for j in B) +md*sum(dist[i, j] * z[l, i, j,s] for l in F for i in B for j in B for s in S) - pa*sum(ATR_jt[j,t]*sum(x[l,j,s] for l in F for s in S_t) for j in B for t in T)), sense=minimize)
+        model.objective = Objective(expr=(mo * sum(wm[t]  for t in T) +bs*sum(wb[j] for j in B) +md*sum(dist_ij[i, j] * z[l, i, j,s] for l in F for i in B for j in B for s in S) - pa*sum(ATR_jt[j,t]*sum(x[l,j,s] for l in F for s in S_t) for j in B for t in T)), sense=minimize)
+        print("OBJ OK")
 
         #2 & 3
         model.minimum_demand_list = ConstraintList()
@@ -109,28 +114,31 @@ class GLSP_model():
         for t in T:
             model.minimum_demand_list.add(expr=(sum(x[l, j, s] for s in S_t[t] for j in B for l in F) + wm[t] >= mind_t[t]))
             model.maximum_demand_list.add(expr=(sum(x[l, j, s] for s in S_t[t] for j in B for l in F)  <= maxd_t[t]))
+        print("2 and 3 OK")
 
-        model.limit_harvest_and_transpot_list = ConstraintList()
+        model.limit_harvest_and_transport_list = ConstraintList()
         # 4
         for j in B:
-            model.limit_harvest_and_transpot_list.add(expr=(sum(x[l,j,s] for s in S for l in F) + wb[j] == p_j[j]*f_j[j]))
-
+            model.limit_harvest_and_transport_list.add(expr=(sum(x[l,j,s] for s in S for l in F) + wb[j] == p_j[j]))
+        print("4 OK")
         model.minimum_amount_of_vin_tasse_list = ConstraintList()
         #5
         for t in T:
-            model.minimum_amount_of_vin_tasse_list.add(expr=(sum((x[l,j,s]/TCH[j])*fi_j[j] for s in S_t[t] for l in F for j in V_J) >= vin_t[t]))
+            model.minimum_amount_of_vin_tasse_list.add(expr=(sum((x[l,j,s]/TCH_j[j])*fi_j[j] for s in S_t[t] for l in F for j in V_J) >= vin_t[t]))
+        print("5 OK")
 
         model.limit_harvesting_capacity_list = ConstraintList()
         #6
         for t in T:
             for l in F:
-                model.limit_harvesting_capacity_list.add(expr=( sum(((24)/(col[j]*Nm[l]*Ht))*x[l,j,s] for s in S_t[t] for j in B) + sum( (Nm[l]/Np)*st[i,j]*z[l,i,j,s] for s in S_t[t] for j in B for i in B) <= K[t]))
+                model.limit_harvesting_capacity_list.add(expr=( sum(((24)/(col_j[j]*Nm_l[l]*Ht))*x[l,j,s] for s in S_t[t] for j in B) + sum( (Nm_l[l]/Np)*st_ij[i,j]*z[l,i,j,s] for s in S_t[t] for j in B for i in B) <= K_t[t]))
+        print("6 OK")
 
         model.limit_transport_capacity_list = ConstraintList()
         #7
         for t in T:
-            model.limit_transport_capacity_list.add(expr=(sum((24/(transp[j]*Nt[t]*Htt))*x[l,j,s] for s in S_t[t] for j in B  for l in F) <= K[t]))
-
+            model.limit_transport_capacity_list.add(expr=(sum((24/(transp_j[j]*N_t*Htt))*x[l,j,s] for s in S_t[t] for j in B  for l in F) <= K_t[t]))
+        print("7 OK")
 
         model.limit_production_to_capacity_list = ConstraintList()
         #8
@@ -138,24 +146,30 @@ class GLSP_model():
             for s in S_t[t]:
                 for j in B:
                     for l in F:
-                        model.limit_production_to_capacity_list.add(expr=(x[l,j,s]<= min((transp[j]*Nt[t]*Htt)/24,(col[j]*Nm[l]*Ht)/24)*K[t]*y[l,j,s]))
+                        model.limit_production_to_capacity_list.add(expr=(x[l,j,s]<= min((transp_j[j]*N_t*Htt)/24,(col_j[j]*Nm_l[l]*Ht)/24)*K_t[t]*y[l,j,s]))
+        print("8 OK")
 
         model.floor_of_production_capacity_list = ConstraintList()
         #9
         for s in S:
-            if s>1:
-                for l in F:
-                    for j in B:
-                        model.floor_of_production_capacity_list.add(expr=(x[l,j,s] >= bm[l,j]*(y[l,j,s] - y[l,j,s-1])))
+            if s <= 1:
+                continue
+            for l in F:
+                for j in B:
+                    model.floor_of_production_capacity_list.add(expr=(x[l,j,s] >= bm_lj[l,j]*(y[l,j,s] - y[l,j,s-1])))
+        print("9 OK")
 
 
         model.harvest_all_blocks_list = ConstraintList()
         #10
         for t in T:
-            for s in S_t[t]:
-                for l in F:
-                    valid_blocks = set(value for value in Bs_j[t] if value in Bl_j[l])
+            for l in F:
+                valid_blocks = set(value for value in Bs_j[t] if value in Bl_j[l])
+                if len(valid_blocks) == 0:
+                    continue
+                for s in S_t[t]:
                     model.harvest_all_blocks_list.add(expr=(sum(y[l,j,s] for j in valid_blocks) == 1))
+        print("10 OK")
 
 
         model.consistent_movement_on_period_s_minus_list = ConstraintList()
@@ -165,6 +179,7 @@ class GLSP_model():
                 for l in F:
                     for i in B:
                             model.consistent_movement_on_period_s_minus_list.add(expr=(sum(z[l,i,j,s] for j in B) == y[l,i,s-1]))
+        print("11 OK")
 
         model.consistent_movement_on_period_s_list = ConstraintList()
         #12
@@ -172,14 +187,16 @@ class GLSP_model():
             for l in F:
                 for j in B:
                     model.consistent_movement_on_period_s_list.add(expr=(sum(z[l,i,j,s] for i in B) == y[l,j,s]))
+        print("12 OK")
 
         model.idle_micro_period_list = ConstraintList()
         #13
         for t in T:
-            for s in S_t[t] - SO_t[t]:
+            for s in [s for s in S_t[t] if s != min(S_t[t])]:
                 for j in B:
                     for l in F:
                         model.idle_micro_period_list.add(expr=(y[l,j,s-1] >= y[l,j,s]))
+        print("13 OK")
 
         self.model = model
     
@@ -190,7 +207,7 @@ class GLSP_model():
         solver.options['TimeLimit'] = TimeLim  
         solver.options['SoftMemLimit'] = MemLim
         solver.set_instance(self.model) 
-        results = solver.solve(self.model, tee=True, load_solutions = False,logfi_jle=f'log_gurobi_{self.model.Name}.txt')
+        results = solver.solve(self.model, tee=True, load_solutions = False,logfile=f'log_gurobi_{self.model.Name}.txt')
         
         if solver._solver_model.Status == 17:  # Memory limit reached (pyomo does not handle this)
             results.solver.termination_condition = TerminationCondition.resourceInterrupt
@@ -199,7 +216,7 @@ class GLSP_model():
         self.model.solutions.load_from(results)
 
         grb = solver._solver_model
-        stats = {
+        stats = { 
                 'objective_value': grb.ObjVal if grb.SolCount > 0 else None,
                 'termination_condition': str(results.solver.termination_condition),
                 'number_of_variables': self.model.nvariables(),
