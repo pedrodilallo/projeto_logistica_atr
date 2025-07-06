@@ -36,7 +36,7 @@ class Instance:
     dist_ij: Optional[np.ndarray]  # Distances, shape (len(B), len(B))
     ATR_jt: Optional[np.ndarray]  # Sucrose per ton, shape (len(B), len(T))
     Ht: Optional[float]  # Machine hours per day
-    N_t: Optional[int]  # Number of trucks
+    N_t: Optional[Dict[int,int]]  # Number of trucks
     Htt: Optional[float]  # Truck hours per day
     Np: Optional[int]  # Number of platform vehicles
     mo: Optional[float]  # Opportunity cost of unground cane ton when mind_t not met
@@ -82,7 +82,8 @@ class Instance:
         self.md = kwargs.get('md', None)
         self.pa = kwargs.get('pa', None)
         self.bm_lj = kwargs.get('bm_lj', None)
-        self.N = kwargs.get('microperiods_per_t', 22)
+        self.N = kwargs.get('N', 22)
+        print(kwargs.get('N'))
 
         try: 
             self.S_t = {t: [s + self.N * (t - 1) for s in range(1, self.N + 1)] for t in self.T} # type: ignore
@@ -106,7 +107,7 @@ class Instance:
         self.F = list(range(1, size_F + 1))
         self.T = list(range(1, size_T + 1))
 
-        min_window = kwargs.get('min_window', 1)
+        min_window = kwargs.get('min_window', size_T)
         max_window = kwargs.get('max_window', size_T)
         harvest_window_j = {}
         for j in self.B:
@@ -125,7 +126,7 @@ class Instance:
 
         # Normal distributions
         self.p_j = np.random.normal(
-            kwargs.get('p_j_mean', 1000), 
+            kwargs.get('p_j_mean', 10000), 
             kwargs.get('p_j_std', 20), 
             size_B
         ).tolist()
@@ -187,8 +188,8 @@ class Instance:
         ).tolist()
 
         self.vin_t = np.random.uniform(
-            kwargs.get('vin_t_min', 10), 
-            kwargs.get('vin_t_max', 20), 
+            kwargs.get('vin_t_min', 0), 
+            kwargs.get('vin_t_max', 1), 
             size_T
         ).tolist()
 
@@ -222,7 +223,7 @@ class Instance:
 
         # Fixed values
         self.Ht = kwargs.get('Ht', 8.0)
-        self.N_t = kwargs.get('N_t', 10)
+        self.N_t = kwargs.get('N_t', {x: 10 for x in range(1,size_T+1)})
         self.Htt = kwargs.get('Htt', 8.0)
         self.Np = kwargs.get('Np', size_F)
         self.mo = kwargs.get('mo', 10.0)

@@ -51,7 +51,7 @@ class GLSP_model():
         model.ATR_jt = pyo.Param(model.B, model.T, initialize={(j, t): instance.ATR_jt[j-1, t-1] for j in model.B for t in model.T}) # type: ignore
         model.bm_lj = pyo.Param(model.F, model.B, initialize={(l, j): instance.bm_lj[l][j-1] for l in model.F for j in model.B}) # type: ignore
         model.Ht = pyo.Param(initialize=instance.Ht) # type: ignore
-        model.N_t = pyo.Param(initialize=instance.N_t) # type: ignore
+        model.N_t = pyo.Param(model.T,initialize=instance.N_t) # type: ignore
         model.Htt = pyo.Param(initialize=instance.Htt) # type: ignore
         model.Np = pyo.Param(initialize=instance.Np) # type: ignore
         model.mo = pyo.Param(initialize=instance.mo) # type: ignore
@@ -70,18 +70,18 @@ class GLSP_model():
 
         def x_bounds(model,l, j,s):
             return (0, model.p_j[j])
-        model.x = pyo.Var(F, B, S, within=NonNegativeReals) # type: ignore
+        model.x = pyo.Var(F, B, S, within=NonNegativeReals,bounds=x_bounds) # type: ignore
         
         model.y = pyo.Var(F, B, S, within=Binary) # type: ignore
         model.z = pyo.Var(F, B, B, S, within=Binary) # type: ignore
 
         def wm_bounds(model, t):
             return (0, model.mind_t[t])
-        model.wm = Var(T,within=NonNegativeReals) # type: ignore
+        model.wm = Var(T,within=NonNegativeReals,bounds=wm_bounds) # type: ignore
 
         def wb_bounds(model, j):
             return (0, model.p_j[j])
-        model.wb = Var(B,within=NonNegativeReals) # type: ignore
+        model.wb = Var(B,within=NonNegativeReals,bounds = wb_bounds) # type: ignore
 
         # fi_jxando valores impossiveis de y
         for j in B: # type: ignore
@@ -137,7 +137,7 @@ class GLSP_model():
         model.limit_transport_capacity_list = ConstraintList()
         #7
         for t in T:
-            model.limit_transport_capacity_list.add(expr=(sum((24/(transp_j[j]*N_t*Htt))*x[l,j,s] for s in S_t[t] for j in B  for l in F) <= K_t[t]))
+            model.limit_transport_capacity_list.add(expr=(sum((24/(transp_j[j]*N_t[t]*Htt))*x[l,j,s] for s in S_t[t] for j in B  for l in F) <= K_t[t]))
         print("7 OK")
 
         model.limit_production_to_capacity_list = ConstraintList()
@@ -146,7 +146,7 @@ class GLSP_model():
             for s in S_t[t]:
                 for j in B:
                     for l in F:
-                        model.limit_production_to_capacity_list.add(expr=(x[l,j,s]<= min((transp_j[j]*N_t*Htt)/24,(col_j[j]*Nm_l[l]*Ht)/24)*K_t[t]*y[l,j,s]))
+                        model.limit_production_to_capacity_list.add(expr=(x[l,j,s]<= min((transp_j[j]*N_t[t]*Htt)/24,(col_j[j]*Nm_l[l]*Ht)/24)*K_t[t]*y[l,j,s]))
         print("8 OK")
 
         model.floor_of_production_capacity_list = ConstraintList()
