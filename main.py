@@ -110,6 +110,9 @@ inst.save()
 
 model = GLSP_model(inst)
 #model.model.pprint(filename='Constrantslist_Validacao1.txt')
+
+gamma,atr_deviation = model.uncertainty(10,0.1)
+model.robustness(gamma,atr_deviation)
 model.solve()
 
 logging_logger = logging.getLogger()

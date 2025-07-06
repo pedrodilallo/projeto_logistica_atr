@@ -199,6 +199,63 @@ class GLSP_model():
         print("13 OK")
 
         self.model = model
+
+    def uncertainty(self,gamma,delta):
+        Gamma = [gamma for _ in range(len(self.model.T))]
+        ATR_deviation = np.zeros((len(self.model.B),len(self.model.T)))
+        for j in self.model.B: 
+            for t in self.model.T: 
+                ATR_deviation[j-1,t-1] = self.model.ATR_jt[j,t] * delta
+        
+        return Gamma,ATR_deviation
+    
+    def robustness(self,Gamma: list[int],uncertainty: np.array): 
+        model = self.model
+
+        B, F, T, S, V_J, S_t, SO_t = model.B, model.F, model.T, model.S, model.V_J, model.S_t, model.SO_t
+        p_j, Bl_j, Bs_j, mind_t, maxd_t, vin_t, fi_j, TCH_j, Nm_l, col_j, Ht, N_t, K_t, transp_j, st_ij, dist_ij, bm_lj, Htt, Np, mo, bs, md = model.p_j, model.Bl_j, model.Bs_j, model.mind_t, model.maxd_t, model.vin_t, model.fi_j, model.TCH_j, model.Nm_l, model.col_j, model.Ht, model.N_t, model.K_t, model.transp_j, model.st_ij, model.dist_ij, model.bm_lj, model.Htt, model.Np, model.mo, model.bs, model.md
+        
+        x, y, z, wm, wb = model.x, model.y, model.z, model.wm, model.wb
+        pa, ATR_jt = model.pa, model.ATR_jt
+
+        # New vars for robustness 
+        model.theta = pyo.Var( within=NonNegativeReals )
+        model.alpha = pyo.Var(model.T, within=NonNegativeReals )
+        model.beta = pyo.Var(model.B, model.T, within=NonNegativeReals )
+        theta,alpha,beta = model.theta, model.alpha, model.beta
+
+        model.objective = Objective(expr=( - theta + \
+            mo*sum(wm[t] for t in T) + \
+            bs*sum(wb[j] for j in B) + \
+            md*sum(dist_ij[i, j] * z[l, i, j,s] for l in F for i in B for j in B for s in S) ), sense=minimize)
+
+        model.obj_revenue = ConstraintList()
+
+        if max(Gamma) == 0:
+            # DETERMINISTIC
+            print("DETERMINISTIC")
+            model.obj_revenue.add(expr=( theta == pa*sum(self.model.ATR_jt[j,t] * sum(x[l,j,s] for l in F for s in S) for j in B for t in T) ))
+        
+        elif max(Gamma) == -1:
+            # WORST-CASE (SOYSTER)
+            print("WORST-CASE (SOYSTER)")
+            model.obj_revenue.add(expr=( theta == pa*sum( (self.model.ATR_jt[j,t] - uncertainty[j-1,t-1]) * sum(x[l,j,s] for l in F for s in S) for j in B for t in T) ))
+
+        elif max(Gamma) > 0:
+            # ROBUST
+            print("ROBUST")
+            model.obj_revenue.add(expr=( theta <= pa*( \
+                sum(self.model.ATR_jt[j,t] * sum(x[l,j,s] for l in F for s in S) for j in B for t in T) - \
+                sum(beta[j,t] for j in B for t in T) - \
+                sum( Gamma[t-1]*alpha[t] for t in T) ) ) )
+            
+            for j in B:
+                for t in T:
+                    model.obj_revenue.add(expr=( alpha[t] + beta[j,t] >= uncertainty[j-1,t-1] * sum(x[l,j,s] for l in F for s in S) ) )
+
+
+
+        self.model = model
     
     def solve(self,TimeLim: float = 600 ,MemLim: float = 13.2):
         
