@@ -125,13 +125,13 @@ class Instance:
 
         # Normal distributions
         self.p_j = np.random.normal(
-            kwargs.get('p_j_mean', 100), 
+            kwargs.get('p_j_mean', 1000), 
             kwargs.get('p_j_std', 20), 
             size_B
         ).tolist()
 
         a, b = 0, np.inf  # Truncate below 0
-        mu, sigma = kwargs.get('TCH_j_mean', 50), kwargs.get('TCH_j_std', 10)
+        mu, sigma = kwargs.get('TCH_j_mean', 100), kwargs.get('TCH_j_std', 15)
         self.TCH_j = truncnorm.rvs(
             a=(a - mu) / sigma, b=(b - mu) / sigma, loc=mu, scale=sigma, size=size_B
         ).tolist()
@@ -166,17 +166,17 @@ class Instance:
                     )
 
         # Uniform distributions
-        col_j_min = max(0.1, kwargs.get('col_j_min', 5))
+        col_j_min = max(0.1, kwargs.get('col_j_min', 100))
         self.col_j = np.random.uniform(
             col_j_min, 
-            kwargs.get('col_j_max', 10), 
+            kwargs.get('col_j_max', 300), 
             size_B
         ).tolist()
 
-        transp_j_min = max(0.1, kwargs.get('transp_j_min', 10))
+        transp_j_min = max(0.1, kwargs.get('transp_j_min', 100))
         self.transp_j = np.random.uniform(
             transp_j_min, 
-            kwargs.get('transp_j_max', 20), 
+            kwargs.get('transp_j_max', 200), 
             size_B
         ).tolist()
 
@@ -193,8 +193,8 @@ class Instance:
         ).tolist()
 
         self.K_t = np.random.uniform(
-            kwargs.get('K_t_min', 0.8), 
-            kwargs.get('K_t_max', 1.0), 
+            kwargs.get('K_t_min', 10000), 
+            kwargs.get('K_t_max', 10001), 
             size_T
         ).tolist()
 
@@ -224,7 +224,7 @@ class Instance:
         self.Ht = kwargs.get('Ht', 8.0)
         self.N_t = kwargs.get('N_t', 10)
         self.Htt = kwargs.get('Htt', 8.0)
-        self.Np = kwargs.get('Np', 5)
+        self.Np = kwargs.get('Np', size_F)
         self.mo = kwargs.get('mo', 10.0)
         self.bs = kwargs.get('bs', 5.0)
         self.md = kwargs.get('md', 1.0)

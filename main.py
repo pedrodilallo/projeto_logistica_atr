@@ -19,12 +19,10 @@ from model import GLSP_model
 
 params = {'microperiods_per_t': 4}
 inst = Instance("Validacao1",kwargs=params)
-inst.generate(30,5,12)  
+inst.generate(5,5,12,kwargs=params)  
 inst.save()
-inst.visualize_instance()
+#inst.visualize_instance()
 
 model = GLSP_model(inst)
-model.model.pprint(filename='Constrantslist_Validacao1.txt')
-
+#model.model.pprint(filename='Constrantslist_Validacao1.txt')
 model.solve()
-

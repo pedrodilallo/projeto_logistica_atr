@@ -70,18 +70,18 @@ class GLSP_model():
 
         def x_bounds(model,l, j,s):
             return (0, model.p_j[j])
-        model.x = pyo.Var(F, B, S, within=NonNegativeReals,bounds=x_bounds) # type: ignore
+        model.x = pyo.Var(F, B, S, within=NonNegativeReals) # type: ignore
         
         model.y = pyo.Var(F, B, S, within=Binary) # type: ignore
         model.z = pyo.Var(F, B, B, S, within=Binary) # type: ignore
 
         def wm_bounds(model, t):
             return (0, model.mind_t[t])
-        model.wm = Var(T, bounds=wm_bounds) # type: ignore
+        model.wm = Var(T,within=NonNegativeReals) # type: ignore
 
         def wb_bounds(model, j):
             return (0, model.p_j[j])
-        model.wb = Var(B, bounds=wb_bounds) # type: ignore
+        model.wb = Var(B,within=NonNegativeReals) # type: ignore
 
         # fi_jxando valores impossiveis de y
         for j in B: # type: ignore
@@ -192,7 +192,7 @@ class GLSP_model():
         model.idle_micro_period_list = ConstraintList()
         #13
         for t in T:
-            for s in [s for s in S_t[t] if s != min(S_t[t])]:
+            for s in [microperiod for microperiod in S_t[t] if microperiod != min(S_t[t])]:
                 for j in B:
                     for l in F:
                         model.idle_micro_period_list.add(expr=(y[l,j,s-1] >= y[l,j,s]))
