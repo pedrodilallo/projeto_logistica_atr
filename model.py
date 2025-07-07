@@ -212,6 +212,9 @@ class GLSP_model():
     def robustness(self,Gamma: list[int],uncertainty: np.array): 
         model = self.model
 
+        model.ATR_deviation = Param(model.B, model.T, initialize={(j, t): uncertainty[j-1, t-1] for j in model.B for t in model.T})
+        ATR_deviation = model.ATR_deviation
+
         B, F, T, S, V_J, S_t, SO_t = model.B, model.F, model.T, model.S, model.V_J, model.S_t, model.SO_t
         p_j, Bl_j, Bs_j, mind_t, maxd_t, vin_t, fi_j, TCH_j, Nm_l, col_j, Ht, N_t, K_t, transp_j, st_ij, dist_ij, bm_lj, Htt, Np, mo, bs, md = model.p_j, model.Bl_j, model.Bs_j, model.mind_t, model.maxd_t, model.vin_t, model.fi_j, model.TCH_j, model.Nm_l, model.col_j, model.Ht, model.N_t, model.K_t, model.transp_j, model.st_ij, model.dist_ij, model.bm_lj, model.Htt, model.Np, model.mo, model.bs, model.md
         
@@ -239,7 +242,7 @@ class GLSP_model():
         elif max(Gamma) == -1:
             # WORST-CASE (SOYSTER)
             print("WORST-CASE (SOYSTER)")
-            model.obj_revenue.add(expr=( theta == pa*sum( (self.model.ATR_jt[j,t] - uncertainty[j-1,t-1]) * sum(x[l,j,s] for l in F for s in S) for j in B for t in T) ))
+            model.obj_revenue.add(expr=( theta == pa*sum( (self.model.ATR_jt[j,t] - ATR_deviation[j,t]) * sum(x[l,j,s] for l in F for s in S) for j in B for t in T) ))
 
         elif max(Gamma) > 0:
             # ROBUST
@@ -251,7 +254,7 @@ class GLSP_model():
             
             for j in B:
                 for t in T:
-                    model.obj_revenue.add(expr=( alpha[t] + beta[j,t] >= uncertainty[j-1,t-1] * sum(x[l,j,s] for l in F for s in S) ) )
+                    model.obj_revenue.add(expr=( alpha[t] + beta[j,t] >= ATR_deviation[j,t] * sum(x[l,j,s] for l in F for s in S) ) )
 
 
 
