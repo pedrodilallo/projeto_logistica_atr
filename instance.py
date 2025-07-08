@@ -93,22 +93,14 @@ class Instance:
             self.SO_t =  None
 
     def generate(self, size_B: int, size_F: int, size_T: int, **kwargs):
-        """
-        Generate an instance based on sizes using random distributions.
-        
-        Args:
-            size_B (int): Number of harvest blocks.
-            size_F (int): Number of harvest fronts.
-            size_T (int): Number of macroperiods.
-            **kwargs: Distribution parameters (e.g., 'p_j_mean', 'p_j_std', 'col_j_min', 'col_j_max').
-        """
-        # Index sets
+
         self.B = list(range(1, size_B + 1))
         self.F = list(range(1, size_F + 1))
         self.T = list(range(1, size_T + 1))
 
-        min_window = kwargs.get('min_window', size_T)
-        max_window = kwargs.get('max_window', size_T)
+
+        min_window = kwargs.get('min_window', np.ceil(size_T/4.5))
+        max_window = kwargs.get('max_window', np.ceil(size_T/1.25))
         harvest_window_j = {}
         for j in self.B:
             window_length_j = random.randint(min_window, max_window)
@@ -120,26 +112,18 @@ class Instance:
         self.Bs_j = {t: {j for j in self.B if harvest_window_j[j][0] <= t <= harvest_window_j[j][1]} for t in self.T}
 
         # Microperiods
-        microperiods_per_t = kwargs.get('microperiods_per_t', 3)
+        microperiods_per_t = kwargs.get('microperiods_per_t', 4)
         self.S_t = {t: [s + self.N * (t - 1) for s in range(1, self.N + 1)] for t in self.T}
         self.SO_t = {t: [self.S_t[t][0]] for t in self.T} # type: ignore
 
-        # Normal distributions
-        self.p_j = np.random.normal(
-            kwargs.get('p_j_mean', 10000), 
-            kwargs.get('p_j_std', 20), 
-            size_B
-        ).tolist()
 
-        a, b = 0, np.inf  # Truncate below 0
-        mu, sigma = kwargs.get('TCH_j_mean', 100), kwargs.get('TCH_j_std', 15)
-        self.TCH_j = truncnorm.rvs(
-            a=(a - mu) / sigma, b=(b - mu) / sigma, loc=mu, scale=sigma, size=size_B
-        ).tolist()
+        self.p_j = np.random.triangular(kwargs.get('p_j_min',4000),kwargs.get('p_j_mode',8000),kwargs.get('p_j_max',16000),size=size_B)
 
+        self.TCH_j = np.random.triangular(kwargs.get('TCH_j_min',80),kwargs.get('TCH_j_mode',100),kwargs.get('TCH_j_max',140),size_B)
+        
         self.mind_t = np.random.normal(
-            kwargs.get('mind_t_mean', 500), 
-            kwargs.get('mind_t_std', 50), 
+            kwargs.get('mind_t_mean', 7500*self.N), 
+            kwargs.get('mind_t_std', 10), 
             size_T
         ).tolist()
 
@@ -162,40 +146,31 @@ class Instance:
             for t in self.T:
                 if start_j <= t <= end_j:
                     self.ATR_jt[j-1, t-1] = np.random.normal(
-                        kwargs.get('ATR_jt_mean', 10), 
-                        kwargs.get('ATR_jt_std', 1)
+                        kwargs.get('ATR_jt_mean', 0.8), 
+                        kwargs.get('ATR_jt_std', 0.05)
                     )
 
-        # Uniform distributions
-        col_j_min = max(0.1, kwargs.get('col_j_min', 100))
-        self.col_j = np.random.uniform(
-            col_j_min, 
-            kwargs.get('col_j_max', 300), 
-            size_B
-        ).tolist()
 
-        transp_j_min = max(0.1, kwargs.get('transp_j_min', 100))
-        self.transp_j = np.random.uniform(
-            transp_j_min, 
-            kwargs.get('transp_j_max', 200), 
-            size_B
-        ).tolist()
+        self.col_j = np.random.triangular(kwargs.get('col_j_min',49.7),kwargs.get('col_j_mode',56.4),kwargs.get('col_j_max',59.7),size=size_B).tolist()
 
-        self.fi_j = np.random.uniform(
-            kwargs.get('fi_j_min', 0), 
-            kwargs.get('fi_j_max', 1), 
-            size_B
-        ).tolist()
+        self.transp_j = np.random.triangular(kwargs.get('transp_j_min',49.7*0.9),kwargs.get('transp_j_mode',56.4*0.9),kwargs.get('transp_j_max',59.7*0.9),size=size_B).tolist()
 
-        self.vin_t = np.random.uniform(
-            kwargs.get('vin_t_min', 0), 
-            kwargs.get('vin_t_max', 1), 
-            size_T
-        ).tolist()
+#        self.fi_j = np.random.uniform(
+#            kwargs.get('fi_j_min', 0), 
+#            kwargs.get('fi_j_max', 1), 
+#            size_B
+#        ).tolist()
+
+        self.fi_j = [1 for _ in range(size_B)]
+
+        total_area = (self.p_j/self.TCH_j).sum()
+        total_area_per_period = total_area/size_T
+        self.vin_t = [0 for _ in range(size_T)]
+
 
         self.K_t = np.random.uniform(
-            kwargs.get('K_t_min', 10000), 
-            kwargs.get('K_t_max', 10001), 
+            kwargs.get('K_t_min', 8*self.N), 
+            kwargs.get('K_t_max', 16*self.N), 
             size_T
         ).tolist()
 
@@ -208,29 +183,25 @@ class Instance:
         }
 
         # Poisson distribution
-        self.Nm_l =  [max(1, val) for val in poisson.rvs(
-            kwargs.get('Nm_l_mean', 5), 
-            size=(size_F,) )] # type: ignore
+        self.Nm_l =  [5 for _ in range(size_F)]
 
         # Derived parameters
-        maxd_t_offset = kwargs.get('maxd_t_offset', 100)
-        self.maxd_t = [mind + maxd_t_offset for mind in self.mind_t] # type: ignore
+        maxd_t_offset = kwargs.get('maxd_t_offset', 2000)
+        self.maxd_t = [mind + maxd_t_offset for mind in self.mind_t] 
 
         # Sets
-        self.V_J = {j for j, fi in zip(self.B, self.fi_j) if fi > 0.5} # type: ignore
-        self.Bl_j = {l: set(random.sample(self.B, k=random.randint(1, size_B))) for l in self.F}
-        self.Bs_j = {t: set(random.sample(self.B, k=random.randint(1, size_B))) for t in self.T}
+        self.V_J = {j for j, fi in zip(self.B, self.fi_j) if fi > 0} # type: ignore
+        self.Bl_j = {l: set(random.sample(self.B, k=random.randint(np.ceil(size_B*0.5), size_B))) for l in self.F}
 
-        # Fixed values
-        self.Ht = kwargs.get('Ht', 8.0)
+        self.Ht = kwargs.get('Ht', 10)
         self.N_t = kwargs.get('N_t', {x: 10 for x in range(1,size_T+1)})
-        self.Htt = kwargs.get('Htt', 8.0)
+        self.Htt = kwargs.get('Htt', 10)
         self.Np = kwargs.get('Np', size_F)
         self.mo = kwargs.get('mo', 10.0)
         self.bs = kwargs.get('bs', 5.0)
         self.md = kwargs.get('md', 1.0)
-        self.pa = kwargs.get('pa', 20.0)
-
+        self.pa = kwargs.get('pa', 2.0)
+        
     def save(self):
         sizes = f"{len(self.B)}_{len(self.F)}_{len(self.T)}" # type: ignore
         current_time = datetime.now().strftime("%Y%m%d%H%M")

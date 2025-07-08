@@ -104,20 +104,22 @@ params = {
 'N': 3
 }
 
-inst = Instance("Validacao1",**params)
-inst.save()
+#inst = Instance("Validacao1",**params)
+#inst.save()
 #inst.visualize_instance()
 
-model = GLSP_model(inst)
+#model = GLSP_model(inst)
 #model.model.pprint(filename='Constrantslist_Validacao1.txt')
 
-gamma,atr_deviation = model.uncertainty(10,0.1)
-model.robustness(gamma,atr_deviation)
-model.solve()
+#gamma,atr_deviation = model.uncertainty(10,0.1)
+#model.robustness(gamma,atr_deviation)
+#model.solve()
 
-logging_logger = logging.getLogger()
-logging_logger.setLevel(logging.DEBUG)
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-logging_logger.addHandler(ch)
+
+inst_2 = Instance('Validacao2')
+inst_2.generate(6,3,12)
+print(inst_2.vin_t)
+model2 = GLSP_model(inst_2)
+model2.solve()
+
 #log_infeasible_constraints(model.model, log_expression=True, log_variables=True, logger=logging_logger)
