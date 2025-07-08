@@ -2,6 +2,7 @@ import pandas as pd
 import pyomo.environ as pyo
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
+from pyomo.opt import TerminationCondition, SolverStatus
 import numpy as np
 
 class GLSP_model():
@@ -260,15 +261,19 @@ class GLSP_model():
 
         self.model = model
     
-    def solve(self,TimeLim: float = 600 ,MemLim: float = 13.2):
+    def solve(self,TimeLim: float = 600 ,MemLim: float = 13.2,log: bool = False):
         
-        self.model.write(f'debug_{self.model.Name}.lp',io_options={'symbolic_solver_labels': True})
+        
         solver = pyo.SolverFactory('gurobi_persistent')
         solver.options['TimeLimit'] = TimeLim  
         solver.options['SoftMemLimit'] = MemLim
         solver.set_instance(self.model) 
-        results = solver.solve(self.model, tee=True, load_solutions = False,logfile=f'log_gurobi_{self.model.Name}.txt')
-        
+
+        if log:
+            results = solver.solve(self.model, tee=True, load_solutions = False,logfile=f'log_gurobi_{self.model.Name}.txt')
+        else: 
+            results = solver.solve(self.model, tee=True, load_solutions = False)
+
         if solver._solver_model.Status == 17:  # Memory limit reached (pyomo does not handle this)
             results.solver.termination_condition = TerminationCondition.resourceInterrupt
             results.solver.status = SolverStatus.warning

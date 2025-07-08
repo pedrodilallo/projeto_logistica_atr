@@ -83,7 +83,6 @@ class Instance:
         self.pa = kwargs.get('pa', None)
         self.bm_lj = kwargs.get('bm_lj', None)
         self.N = kwargs.get('N', 22)
-        print(kwargs.get('N'))
 
         try: 
             self.S_t = {t: [s + self.N * (t - 1) for s in range(1, self.N + 1)] for t in self.T} # type: ignore
