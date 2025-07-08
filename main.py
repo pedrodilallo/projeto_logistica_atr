@@ -1,3 +1,4 @@
+import os
 import solutions
 import pandas as pd
 import pyomo.environ as pyo
@@ -112,31 +113,34 @@ params = {
 #model.robustness(gamma,atr_deviation)
 #model.solve()
 
+
+files = [f for f in os.listdir('instance_objects') if os.path.isfile(os.path.join('instance_objects', f))]
+
+
+
 n = 1
-for size_B in range(10,31):
-    for size_F in range(1,5):
-        for size_T in range(5,9):
-            feasable_found = False   
-            while not feasable_found:
-                instance_name = f'Factivel{n}_B{size_B}_F{size_F}_T{size_T}'
-                instacia = Instance(instance_name)
-                instacia.generate(10,3,8)
-                model2 = GLSP_model(instacia)
-                results,stats = model2.solve()
+for file in files:
+    for gamma in [-1,0,1]:
+        instacia = open(file, 'rb')()
+        instacia.generate(size_B,size_F,size_T)
+        model2 = GLSP_model(instacia)
+        Gamma,uncertainty = model2.uncertainty()
+        model2.robustness(Gamma,uncertainty)
+        results,stats = model2.solve()
 
-                if results.solver.termination_condition != 'infeasable':
-                    feasable_found = True
-                    instacia.save()
-                    stats_df = pd.DataFrame(stats)
-                    stats_df.to_csv(f'solution_files/{instance_name}.csv')
-                    current_time = datetime.now().strftime("%Y%m%d%H%M")
+        if results.solver.termination_condition != 'infeasible':
+            name = file.replace('Factivel','Robusta').replace('instance_','')[:-17] + f"gamma{gamma}"
+            instacia.save()
+            stats_df = pd.DataFrame([stats])
+            stats_df.to_csv(f'solution_files/{name}.csv')
+            current_time = datetime.now().strftime("%Y%m%d%H%M")
 
-                    filename = f"solution_objects/results_{instance_name}_{current_time}.pkl"
-                    with open(filename, 'wb') as f:
-                        pickle.dump(results, f)
+            filename = f"solution_objects/results_{name}_{current_time}.pkl"
+            with open(filename, 'wb') as f:
+                pickle.dump(results, f)
 
-                    filename = f"solution_objects/model_{instance_name}_{current_time}.pkl"
-                    with open(filename, 'wb') as f:
-                        pickle.dump(results, f)
+            filename = f"solution_objects/model_{name}_{current_time}.pkl"
+            with open(filename, 'wb') as f:
+                pickle.dump(results, f)
 
-                    n += 1
+            n += 1

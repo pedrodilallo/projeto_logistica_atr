@@ -1,0 +1,2 @@
+,objective_value,termination_condition,number_of_variables,number_of_constraints,mip_gap,runtime,best_bound,node_count
+0,12252354.530536272,optimal,494241,94872,9.992707142353131e-05,5.317131042480469,12251130.188629992,
