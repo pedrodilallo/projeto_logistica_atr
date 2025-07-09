@@ -120,17 +120,22 @@ files = [f for f in os.listdir('instance_objects') if os.path.isfile(os.path.joi
 
 n = 1
 for file in files:
-    for gamma in [-1,0,1]:
-        instacia = open(file, 'rb')()
-        instacia.generate(size_B,size_F,size_T)
-        model2 = GLSP_model(instacia)
-        Gamma,uncertainty = model2.uncertainty()
+    for gamma in [-1,10]:
+        with open(f"instance_objects/{file}", 'rb') as f:
+            instancia = pickle.load(f)
+
+        model2 = GLSP_model(instancia)
+        Gamma,uncertainty = model2.uncertainty(gamma,0.1)
         model2.robustness(Gamma,uncertainty)
         results,stats = model2.solve()
 
         if results.solver.termination_condition != 'infeasible':
-            name = file.replace('Factivel','Robusta').replace('instance_','')[:-17] + f"gamma{gamma}"
-            instacia.save()
+            
+            category = 'robust'
+            if gamma == -1: 
+                category = 'soyster'
+
+            name = file.replace('Factivel','Robusta').replace('instance_','')[:-17] + category
             stats_df = pd.DataFrame([stats])
             stats_df.to_csv(f'solution_files/{name}.csv')
             current_time = datetime.now().strftime("%Y%m%d%H%M")

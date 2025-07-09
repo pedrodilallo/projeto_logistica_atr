@@ -228,6 +228,8 @@ class GLSP_model():
         model.beta = pyo.Var(model.B, model.T, within=NonNegativeReals )
         theta,alpha,beta = model.theta, model.alpha, model.beta
 
+
+        model.del_component(model.objective)
         model.objective = Objective(expr=( - theta + \
             mo*sum(wm[t] for t in T) + \
             bs*sum(wb[j] for j in B) + \
