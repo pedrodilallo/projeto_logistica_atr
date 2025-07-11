@@ -1,4 +1,5 @@
 import os
+import re
 import solutions
 import pandas as pd
 import pyomo.environ as pyo
@@ -102,50 +103,56 @@ params = {
 'N': 3
 }
 
-#inst = Instance("Validacao1",**params)
-#inst.save()
-#inst.visualize_instance()
-
-#model = GLSP_model(inst)
-#model.model.pprint(filename='Constrantslist_Validacao1.txt')
-
-#gamma,atr_deviation = model.uncertainty(10,0.1)
-#model.robustness(gamma,atr_deviation)
-#model.solve()
+def extract_instance_id(instance_name):
+    match = re.search(r'(Factivel|Robusta)(\d+)', instance_name)
+    return int(match.group(2)) if match else None
 
 
 files = [f for f in os.listdir('instance_objects') if os.path.isfile(os.path.join('instance_objects', f))]
 
-
-
 n = 1
-for file in files:
-    for gamma in [-1,10]:
-        with open(f"instance_objects/{file}", 'rb') as f:
-            instancia = pickle.load(f)
+instances = ['instance_Factivel21_B30_F3_T9_30_3_9_202507081614.pkl',
+       'instance_Factivel42_B30_F4_T9_30_4_9_202507081636.pkl',
+       'instance_Factivel63_B30_F5_T9_30_5_9_202507081703.pkl']
 
-        model2 = GLSP_model(instancia)
-        Gamma,uncertainty = model2.uncertainty(gamma,0.1)
-        model2.robustness(Gamma,uncertainty)
-        results,stats = model2.solve()
+# Initialize DataFrame to store all stats
+all_stats = []
 
-        if results.solver.termination_condition != 'infeasible':
-            
-            category = 'robust'
-            if gamma == -1: 
-                category = 'soyster'
+for file in instances:
+    instance_id = extract_instance_id(file)
 
-            name = file.replace('Factivel','Robusta').replace('instance_','')[:-17] + category
-            stats_df = pd.DataFrame([stats])
-            stats_df.to_csv(f'solution_files/{name}.csv')
-            current_time = datetime.now().strftime("%Y%m%d%H%M")
+    with open(f"instance_objects/{file}", 'rb') as f:
+        instancia = pickle.load(f)
 
-            filename = f"solution_objects/results_{name}_{current_time}.pkl"
-            with open(filename, 'wb') as f:
-                pickle.dump(results, f)
+#    original_TCH_j = np.array(instancia.TCH_j, dtype=float)
+#    original_transp_j = np.array(instancia.transp_j, dtype=float)
 
-            filename = f"solution_objects/model_{name}_{current_time}.pkl"
-            with open(filename, 'wb') as f:
-                pickle.dump(results, f)
+    # Iterate over scaling factors
+    for delta in [0.1,0.2,0.3]:
+        #transp_scale = transp_scale/100
+        # Modify parameters
+        #instancia.transp_j = original_transp_j * transp_scale
+        
+        # Solve the model
+        model = GLSP_model(instancia)
+        Gamma,ATR_deviation = model.uncertainty(-1,delta)
+        model.robustness(Gamma,ATR_deviation)
+        results, stats = model.solve()
+        
+        stats.update({
+            'instance_id': instance_id,
+            'instance': file,
+            'category': 'Soyster',
+            'gamma': -1,
+            'delta': delta,
+            'timestamp': datetime.now().strftime("%Y%m%d%H%M")
+        })
+        
+        all_stats.append(stats)
+        
+#        instancia.TCH_j = original_TCH_j.copy()
+#        instancia.transp_j = original_transp_j.copy()
 
-            n += 1
+stats_df = pd.DataFrame(all_stats)
+stats_df.to_csv('soyster.csv', index=False)
+
