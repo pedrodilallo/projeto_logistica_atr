@@ -19,140 +19,55 @@ from pyomo.opt import TerminationCondition, SolverStatus
 from instance import Instance
 from model import GLSP_model
 
-size_B = 6 # number of blocks
-size_F = 3 # number of fronts
-size_T = 4 # number o macro-periods
-N = 3 # number of subperiods per period
-V_j = {1,2,3,4,5,6}
-V_j = sorted(V_j)  # Convert to a sorted list
-Blj = {1: [1,2,3,4,5,6],2:[1,2,3,4,5,6],3:[1,2,3,4,5,6]} # which front can harvest each block
-Bsj = {1: [1,2,3,4],2:[1,2,3,4], 3:[2,3,4,5,6], 4:[3,4,5,6]} # blocks that can be harvested on each period
-p = [1000,1500, 5000, 4000, 2000, 400]
-mind = [2000 ,2000,2000,2000]
-maxd = [5000 ,3000,4000,3000]
-vin = [15/3, 15/3, 30/3, 20/3]
-fi = [0.9,1,0.95,0.9,0.8,1]
-TCH = [ 100,80,100,70,60,60] # 80 ton/hec na media
-Nm =  [30,20,10]
-col = [59,79,100,80,90,1]
-Ht = 10
-Nt = {1: 18,2:10,3:10,4:12}
-Htt = 10
-K = [36*8*3*8,  36*8*3*8, 36*8*3*8, 36*8*3*8]
-transp =  [1.5*80,1.5*60,1.5*90,1.5*85,1.5*100,1.5*1]
-dist =np.array([[0, 5, 10, 15, 20, 25],
-                   [5, 0, 6, 11, 16, 21],
-                   [10, 6, 0, 7, 12, 17],
-                   [15, 11, 7, 0, 8, 13],
-                   [20, 16, 12, 8, 0, 9],
-                   [25, 21, 17, 13, 9, 0]])
+def generate_hierarchy(base_seed: int = 2002):
 
-st = np.array([[0, 0.125, 0.25, 0.375, 0.5, 0.625],
-                   [0.125, 0, 0.15, 0.275, 0.4, 0.525],
-                   [0.25, 0.15, 0, 0.175, 0.3, 0.425],
-                   [0.375, 0.275, 0.175, 0, 0.2, 0.325],
-                   [0.5, 0.4, 0.3, 0.2, 0, 0.225],
-                   [0.625, 0.525, 0.425, 0.325, 0.225, 0]])
-Np = 30
-bm = {
-    1: [20*25, 15*25, 10*25, 25*25, 18*25, 1000],  # Frente 1 (mecanizada)
-    2: [20*25, 15*25, 10*25, 25*25, 18*25, 1000],  # Frente 2 (mecanizada)
-    3: [ 100,   100,   100,   100,   100,    10]         # Frente 3 (manual)
-}
+    inst_190 = Instance(name="190B", seed=base_seed)
+    inst_190.generate(size_B=190, size_F=3, size_T=10, seed=base_seed)
+    print(f"190B: {len(inst_190.B)} blocks, {np.sum(inst_190.p_j):.0f} tons")
 
-ATR = np.array([[11.83011756,  9.9155148,  10.40389997, 10.93808328],
-                   [10.86479062,  9.52569484, 10.87596935,  9.86554319],
-                   [ 9.26075064,  9.61274446, 11.71629121,  9.8440108 ],
-                   [ 9.91329545,  9.52180207, 10.86937126,  9.09463748],
-                   [ 9.46793727, 10.92704872, 10.46158836, 10.11583283],
-                   [ 9.64246571, 10.80007485,  9.72660241, 10.46389029]])
+    inst_140 = inst_190.create_subset(140, "140B", seed=base_seed + 3)
+    inst_140.name = "140B"
+    print(f"140B: {len(inst_140.B)} blocks, {np.sum(inst_140.p_j):.0f} tons")
+    
+    inst_90 = inst_140.create_subset(90, "90B", seed=base_seed + 3)
+    inst_90.name = "90B"
+    print(f"90B: {len(inst_90.B)} blocks, {np.sum(inst_90.p_j):.0f} tons")
 
-mo = 100_000
-bs = 10_000
-md = 5_000
+    inst_40 = inst_90.create_subset(40, "40B", seed=base_seed + 3)
+    inst_40.name = "40B"
+    print(f"40B: {len(inst_40.B)} blocks, {np.sum(inst_40.p_j):.0f} tons")    
 
-params = {
-'B': [1,2,3,4,5,6],
-'F': [1,2,3],
-'T': [1,2,3,4],
-'p_j':  p,
-'fi_j':  fi,
-'TCH_j':  TCH,
-'col_j':  col,
-'transp_j':  transp,
-'Nm_l':  Nm,
-'mind_t': mind ,
-'maxd_t':  maxd,
-'vin_t':  vin,
-'K_t':  K,
-'V_J': V_j ,
-'Bl_j':  Blj,
-'Bs_j':  Bsj,
-'st_ij':  st,
-'dist_ij':  dist,
-'Ht':  Ht,
-'N_t':  Nt,
-'Htt':  Htt,
-'Np':  Np,
-'mo':  mo,
-'bs':  bs,
-'md':  md,
-'bm_lj':  bm,
-'ATR_jt': ATR,
-'pa': md,
-'N': 3
-}
-
-def extract_instance_id(instance_name):
-    match = re.search(r'(Factivel|Robusta)(\d+)', instance_name)
-    return int(match.group(2)) if match else None
+    return  inst_190,inst_140, inst_90,inst_40
 
 
-files = [f for f in os.listdir('instance_objects') if os.path.isfile(os.path.join('instance_objects', f))]
+def save_vars_csv(model, instance_name, directory="model_variables_test_size"):
+    os.makedirs(directory, exist_ok=True)
+    path = os.path.join(directory, f"{instance_name}_variables.csv")
+    
+    rows = []
+    for var in model.component_objects(pyo.Var, active=True):
+        for index in var:
+            val = pyo.value(var[index], exception=False)
+            if val is None or abs(val) <= 1e-6:
+                continue
+            idx = list(index) if isinstance(index, tuple) else ([index] if index is not None else [])
+            idx += ["-"] * (4 - len(idx))
+            rows.append({"variable": var.name, "idx_1": idx[0], "idx_2": idx[1], "idx_3": idx[2], "idx_4": idx[3], "value": val})
+    
+    pd.DataFrame(rows).to_csv(path, index=False)
 
-n = 1
-instances = ['instance_Factivel21_B30_F3_T9_30_3_9_202507081614.pkl',
-       'instance_Factivel42_B30_F4_T9_30_4_9_202507081636.pkl',
-       'instance_Factivel63_B30_F5_T9_30_5_9_202507081703.pkl']
+instance_list = generate_hierarchy()
+i = 0
+all_stats = {}
+for instance in instance_list:
+    instance.save(directory="size_test_instances2")
+    print(instance.Name)
 
-# Initialize DataFrame to store all stats
-all_stats = []
+    model = GLSP_model(instance)
+    results, stats = model.solve(TimeLim = 7200)  
+    delta = 0
+    all_stats[instance.Name] = stats
+    print(stats)
 
-for file in instances:
-    instance_id = extract_instance_id(file)
-
-    with open(f"instance_objects/{file}", 'rb') as f:
-        instancia = pickle.load(f)
-
-#    original_TCH_j = np.array(instancia.TCH_j, dtype=float)
-#    original_transp_j = np.array(instancia.transp_j, dtype=float)
-
-    # Iterate over scaling factors
-    for delta in [0.1,0.2,0.3]:
-        #transp_scale = transp_scale/100
-        # Modify parameters
-        #instancia.transp_j = original_transp_j * transp_scale
-        
-        # Solve the model
-        model = GLSP_model(instancia)
-        Gamma,ATR_deviation = model.uncertainty(-1,delta)
-        model.robustness(Gamma,ATR_deviation)
-        results, stats = model.solve()
-        
-        stats.update({
-            'instance_id': instance_id,
-            'instance': file,
-            'category': 'Soyster',
-            'gamma': -1,
-            'delta': delta,
-            'timestamp': datetime.now().strftime("%Y%m%d%H%M")
-        })
-        
-        all_stats.append(stats)
-        
-#        instancia.TCH_j = original_TCH_j.copy()
-#        instancia.transp_j = original_transp_j.copy()
-
-stats_df = pd.DataFrame(all_stats)
-stats_df.to_csv('soyster.csv', index=False)
-
+all_stats = pd.DataFrame(all_stats)
+all_stats.to_csv('logs/full_stats_batch_1_testing_time.csv')

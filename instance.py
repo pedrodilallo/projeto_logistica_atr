@@ -1,3 +1,4 @@
+import os 
 from typing import Dict, List, Set, Optional, Any
 import random
 from scipy.stats import poisson,truncnorm
@@ -9,12 +10,6 @@ import seaborn as sns
 
 
 class Instance:
-    """
-    A class to hold the master and transactional data for the optimization model.
-    Attributes can be optionally provided during initialization.
-    """
-
-    # Type hints for all attributes
     name: str
     B: Optional[List[Any]]  # List of harvest block indices
     F: Optional[List[Any]]  # List of harvest front indices
@@ -48,42 +43,17 @@ class Instance:
     S_t: Optional[Dict[int, List[int]]] = None
     SO_t: Optional[Dict[int, List[int]]] = None
 
-    def __init__(self,name, **kwargs):
-        """
-        Initialize the Instance with optional keyword arguments.
-        Any unspecified attributes will default to None.
-        """
+    def __init__(self, name: str, **kwargs):
         self.Name = name
-        self.B = kwargs.get('B', None)
-        self.F = kwargs.get('F', None)
-        self.T = kwargs.get('T', None)
-        self.p_j = kwargs.get('p_j', None)
-        self.fi_j = kwargs.get('fi_j', None)
-        self.TCH_j = kwargs.get('TCH_j', None)
-        self.col_j = kwargs.get('col_j', None)
-        self.transp_j = kwargs.get('transp_j', None)
-        self.Nm_l = kwargs.get('Nm_l', None)
-        self.mind_t = kwargs.get('mind_t', None)
-        self.maxd_t = kwargs.get('maxd_t', None)
-        self.vin_t = kwargs.get('vin_t', None)
-        self.K_t = kwargs.get('K_t', None)
-        self.V_J = kwargs.get('V_J', None)
-        self.Bl_j = kwargs.get('Bl_j', None)
-        self.Bs_j = kwargs.get('Bs_j', None)
-        self.st_ij = kwargs.get('st_ij', None)
-        self.dist_ij = kwargs.get('dist_ij', None)
-        self.ATR_jt = kwargs.get('ATR_jt', None)
-        self.Ht = kwargs.get('Ht', None)
-        self.N_t = kwargs.get('N_t', None)
-        self.Htt = kwargs.get('Htt', None)
-        self.Np = kwargs.get('Np', None)
-        self.mo = kwargs.get('mo', None)
-        self.bs = kwargs.get('bs', None)
-        self.md = kwargs.get('md', None)
-        self.pa = kwargs.get('pa', None)
-        self.bm_lj = kwargs.get('bm_lj', None)
-        self.N = kwargs.get('N', 22)
-
+        self.N = kwargs.get('N', 5)
+        self.seed = kwargs.get('seed', 2002)
+        self.rng = np.random.default_rng(self.seed)
+        
+        # Hierarchical tracking for subdividing instances
+        self.parent_instance: Optional['Instance'] = None
+        self.block_mapping: Optional[Dict[int, int]] = None
+        self.is_subset = False
+        
         try: 
             self.S_t = {t: [s + self.N * (t - 1) for s in range(1, self.N + 1)] for t in self.T} # type: ignore
             self.SO_t = {t: [self.S_t[t][0]] for t in self.T} # type: ignore
@@ -91,123 +61,219 @@ class Instance:
             self.S_t = None
             self.SO_t =  None
 
-    def generate(self, size_B: int, size_F: int, size_T: int, **kwargs):
-
+    def generate(self, size_B: int, size_F: int, size_T: int, **kwargs) -> 'Instance':
+        seed = kwargs.get('seed', self.seed)
+        self.rng = np.random.default_rng(seed)
+        
         self.B = list(range(1, size_B + 1))
         self.F = list(range(1, size_F + 1))
         self.T = list(range(1, size_T + 1))
+        
+        total_S = size_T * self.N
+        self.S = list(range(1, total_S + 1))
 
+        # minimum and maximum durations for time windows
+        window_min = kwargs.get('window_min', 2)
+        window_max = kwargs.get('window_max', 8)
+        window_mode = kwargs.get('window_mode', 3.8)
 
-        min_window = kwargs.get('min_window', np.ceil(size_T/4.5))
-        max_window = kwargs.get('max_window', np.ceil(size_T/1.25))
+        # No block opens after last period (start + window - 1 <= size_T)
         harvest_window_j = {}
         for j in self.B:
-            window_length_j = random.randint(min_window, max_window)
-            start_j = random.randint(1, size_T - window_length_j + 1)
+            raw = self.rng.triangular(window_min, window_mode, window_max)
+            window_length_j = int(np.ceil(raw))
+            window_length_j = np.clip(window_length_j, window_min, window_max)
+
+            # start in [1, size_T - window_length_j + 1] guarantees end <= size_T
+            max_start = size_T - window_length_j + 1
+            start_j = int(self.rng.integers(1, max_start + 1))
             end_j = start_j + window_length_j - 1
+
             harvest_window_j[j] = (start_j, end_j)
 
-        # Generate Bs_j based on harvesting windows
-        self.Bs_j = {t: {j for j in self.B if harvest_window_j[j][0] <= t <= harvest_window_j[j][1]} for t in self.T}
+        self.Bs_j = {t: {j for j in self.B if harvest_window_j[j][0] <= t <= harvest_window_j[j][1]}
+        for t in self.T}
 
         # Microperiods
-        microperiods_per_t = kwargs.get('microperiods_per_t', 4)
-        self.S_t = {t: [s + self.N * (t - 1) for s in range(1, self.N + 1)] for t in self.T}
-        self.SO_t = {t: [self.S_t[t][0]] for t in self.T} # type: ignore
-
-
-        self.p_j = np.random.triangular(kwargs.get('p_j_min',4000),kwargs.get('p_j_mode',8000),kwargs.get('p_j_max',16000),size=size_B)
-
-        self.TCH_j = np.random.triangular(kwargs.get('TCH_j_min',80),kwargs.get('TCH_j_mode',100),kwargs.get('TCH_j_max',140),size_B)
+        self.S_t = {t: list(range((t - 1) * self.N + 1, t * self.N + 1)) for t in self.T}
+        self.SO_t = {t: [self.S_t[t][0]] for t in self.T}
+    
+        # Production parameters
+        p_raw = self.rng.triangular(
+            kwargs.get('p_j_min', 4000),
+            kwargs.get('p_j_mode', 8000),
+            kwargs.get('p_j_max', 16000),
+            size=size_B)
         
-        self.mind_t = np.random.normal(
-            kwargs.get('mind_t_mean', 7500*self.N), 
-            kwargs.get('mind_t_std', 10), 
-            size_T
-        ).tolist()
+        # this is made so the total is adjusted to a realistic amount of tons based on expert feedback.
+        target_total = kwargs.get('p_j_total', 1_500_000)
+        self.p_j = np.ceil(p_raw * (target_total / p_raw.sum()))
 
-        # Compute Euclidean distance matrix in kilometers 
-        coord_min = kwargs.get('coord_min', -100.0) 
-        coord_max = kwargs.get('coord_max', 100.0) 
-        coords = np.random.uniform(coord_min, coord_max, size=(size_B, 2))  # Shape: (size_B, 2)
+        self.TCH_j = self.rng.triangular(
+            kwargs.get('TCH_j_min', 80),
+            kwargs.get('TCH_j_mode', 100),
+            kwargs.get('TCH_j_max', 140),
+            size_B)
+
+        self.col_j = self.rng.triangular(
+            kwargs.get('col_j_min', 49.7),
+            kwargs.get('col_j_mode', 56.4),
+            kwargs.get('col_j_max', 59.7),
+            size=size_B).tolist()
+
+        self.fi_j = [1 for _ in range(size_B)]
+
+        self.block_areas = self.p_j / self.TCH_j        
+
+        # Coordinates and distances
+        coord_min = kwargs.get('coord_min', 0.0)
+        coord_max = kwargs.get('coord_max', 100.0)
+        self.coords = self.rng.uniform(coord_min, coord_max, (size_B, 2))
+
+        diff = self.coords[:, np.newaxis, :] - self.coords[np.newaxis, :, :]
+        self.dist_ij = np.sqrt(np.sum(diff ** 2, axis=2))
+        np.fill_diagonal(self.dist_ij, 0)
+
+        speed = kwargs.get('speed', 50.0)
+        self.st_ij = self.dist_ij / speed
         
-        self.coords = coords
+        # Calculate distances to mill (at origin)
+        mill_coord = np.array([0.0, 0.0])
+        dist_to_mill = np.sqrt(np.sum((self.coords - mill_coord) ** 2, axis=1))
+        dist_to_mill = np.maximum(dist_to_mill, 0.1)
+        truck_capacity = kwargs.get('truck_capacity', 60.0)
+        round_trip_factor = kwargs.get('round_trip_factor', 2.0)
+        self.transp_j = (truck_capacity * speed) / (round_trip_factor * dist_to_mill)
         
-        diff = coords[:, np.newaxis, :] - coords[np.newaxis, :, :]  # Shape: (size_B, size_B, 2)
-        self.dist_ij = np.sqrt(np.sum(diff ** 2, axis=2))  # Shape: (size_B, size_B)
-        np.fill_diagonal(self.dist_ij, 0)  # type: ignore # Set diagonal to 0 (distance to self)
+        # Demands
+        mind_val = kwargs.get('mind_t_val', 210_000)
+        self.mind_t = [float(mind_val) for _ in self.T]
 
-        self.st_ij = self.dist_ij/40
+        maxd_t_offset = kwargs.get('maxd_t_offset', 210_000*0.3)
+        self.maxd_t = [mind + maxd_t_offset for mind in self.mind_t]
 
+        # vin_t
+        self.vin_t = np.full(size_T, 0.2 * (sum(self.TCH_j / self.p_j)) / size_T if size_T > 0 else 0).tolist()
+        
+        # ATR
         self.ATR_jt = np.zeros((size_B, size_T))
+        atr_mean = kwargs.get('ATR_jt_mean', 0.8)
+        atr_spread = kwargs.get('ATR_jt_spread', 0.15)
         for j in self.B:
             start_j, end_j = harvest_window_j[j]
             for t in self.T:
                 if start_j <= t <= end_j:
-                    self.ATR_jt[j-1, t-1] = np.random.normal(
-                        kwargs.get('ATR_jt_mean', 0.8), 
-                        kwargs.get('ATR_jt_std', 0.05)
-                    )
+                    self.ATR_jt[j - 1, t - 1] = self.rng.triangular(
+                        atr_mean - atr_spread,
+                        atr_mean,
+                        atr_mean + atr_spread)
 
+        Ht = kwargs.get('Ht', 10)
+        self.K_t = [float(20 * Ht) for _ in self.T] # 20 operating days per period                 
 
-        self.col_j = np.random.triangular(kwargs.get('col_j_min',49.7),kwargs.get('col_j_mode',56.4),kwargs.get('col_j_max',59.7),size=size_B).tolist()
-
-        self.transp_j = np.random.triangular(kwargs.get('transp_j_min',49.7*0.9),kwargs.get('transp_j_mode',56.4*0.9),kwargs.get('transp_j_max',59.7*0.9),size=size_B).tolist()
-
-#        self.fi_j = np.random.uniform(
-#            kwargs.get('fi_j_min', 0), 
-#            kwargs.get('fi_j_max', 1), 
-#            size_B
-#        ).tolist()
-
-        self.fi_j = [1 for _ in range(size_B)]
-
-        total_area = (self.p_j/self.TCH_j).sum()
-        total_area_per_period = total_area/size_T
-        self.vin_t = [0 for _ in range(size_T)]
-
-
-        self.K_t = np.random.uniform(
-            kwargs.get('K_t_min', 8*self.N), 
-            kwargs.get('K_t_max', 16*self.N), 
-            size_T
-        ).tolist()
+        mean_K = float(np.mean(self.K_t))
 
         self.bm_lj = {
-            l: np.random.uniform(
-                kwargs.get('bm_lj_min', 0), 
-                kwargs.get('bm_lj_max', 10), 
-                size_B
-            ).tolist() for l in self.F
-        }
+            l: [float(self.rng.uniform(
+                kwargs.get('bm_lj_alpha_min', 0.05),
+                kwargs.get('bm_lj_alpha_max', 0.10)) * 
+                self.col_j[j - 1] * mean_K) for j in self.B] for l in self.F}
+                
+            
+        self.Nm_l = [5 for _ in range(size_F)]
+        self.V_J = {j for j, fi in zip(self.B, self.fi_j) if fi > 0}
+        self.Bl_j = {l: set(self.rng.choice(self.B,size=int(self.rng.integers(int(np.ceil(size_B * 0.5)), size_B + 1)),replace=False).tolist()) for l in self.F} #changed logic to all into .rng for more consistency
 
-        # Poisson distribution
-        self.Nm_l =  [5 for _ in range(size_F)]
-
-        # Derived parameters
-        maxd_t_offset = kwargs.get('maxd_t_offset', 2000)
-        self.maxd_t = [mind + maxd_t_offset for mind in self.mind_t] 
-
-        # Sets
-        self.V_J = {j for j, fi in zip(self.B, self.fi_j) if fi > 0} # type: ignore
-        self.Bl_j = {l: set(random.sample(self.B, k=random.randint(np.ceil(size_B*0.5), size_B))) for l in self.F}
-
-        self.Ht = kwargs.get('Ht', 10)
-        self.N_t = kwargs.get('N_t', {x: 10 for x in range(1,size_T+1)})
+        self.Ht = Ht
+        self.N_t = kwargs.get('N_t', {x: 10 for x in range(1, size_T + 1)})
         self.Htt = kwargs.get('Htt', 10)
         self.Np = kwargs.get('Np', size_F)
         self.mo = kwargs.get('mo', 10.0)
         self.bs = kwargs.get('bs', 5.0)
         self.md = kwargs.get('md', 1.0)
         self.pa = kwargs.get('pa', 2.0)
+
+        return self
+            
+    def create_subset(self, num_blocks: int, subset_name: str, seed: Optional[int] = None) -> 'Instance':
+        """Create random subset instance."""
+        if num_blocks >= len(self.B):
+            raise ValueError(f"num_blocks ({num_blocks}) must be less than parent blocks ({len(self.B)})")
         
-    def save(self):
-        sizes = f"{len(self.B)}_{len(self.F)}_{len(self.T)}" # type: ignore
-        current_time = datetime.now().strftime("%Y%m%d%H%M")
-        filename = f"instance_objects/instance_{self.Name}_{sizes}_{current_time}.pkl"
+        if seed is None:
+            seed = self.seed + len(self.B) - num_blocks
+        
+        rng = np.random.default_rng(seed)
+        selected_indices = sorted(rng.choice(len(self.B), size=num_blocks, replace=False))
+        block_mapping = {new_idx + 1: old_idx + 1 for new_idx, old_idx in enumerate(selected_indices)}
+        
+        subset = Instance(name=subset_name, seed=seed, N=self.N)
+        subset.is_subset = True
+        subset.parent_instance = self
+        subset.block_mapping = block_mapping
+        
+        num_F = len(self.F)
+        num_T = len(self.T)
+        subset.B = list(range(1, num_blocks + 1))
+        subset.F = self.F.copy()
+        subset.T = self.T.copy()
+        subset.S = list(range(1, len(self.T) * subset.N + 1))
+        
+        # Subset data
+        subset.p_j = self.p_j[selected_indices].copy()
+        subset.fi_j = [self.fi_j[i] for i in selected_indices]
+        subset.TCH_j = self.TCH_j[selected_indices].copy()
+        subset.col_j = [self.col_j[i] for i in selected_indices]
+        subset.transp_j = [self.transp_j[i] for i in selected_indices]
+        subset.block_areas = self.block_areas[selected_indices].copy()
+        
+        subset.dist_ij = self.dist_ij[np.ix_(selected_indices, selected_indices)].copy()
+        subset.st_ij = self.st_ij[np.ix_(selected_indices, selected_indices)].copy()
+        subset.coords = self.coords[selected_indices, :].copy()
+        subset.ATR_jt = self.ATR_jt[selected_indices, :].copy()
+        
+        subset.mind_t = self.mind_t.copy()
+        subset.maxd_t = self.maxd_t.copy()
+        subset.vin_t = np.full(num_T, 0.2 * (sum(subset.TCH_j / subset.p_j)) / num_T if num_T > 0 else 0).tolist()
+        
+        # Copy period data
+        subset.K_t = self.K_t.copy()
+        subset.N_t = self.N_t.copy()
+        
+        subset.Bs_j = {
+            t: {new_idx + 1 
+                for new_idx, old_idx in enumerate(selected_indices) 
+                if old_idx + 1 in self.Bs_j[t]}
+            for t in subset.T}
+        
+        subset.S_t = {t: list(range((t-1)*subset.N + 1, t*subset.N + 1)) for t in subset.T}
+        subset.SO_t = {t: [subset.S_t[t][0]] for t in subset.T}
+        
+        subset.bm_lj = {l: [self.bm_lj[l][i] for i in selected_indices] for l in subset.F}
+        subset.Nm_l = self.Nm_l.copy()
+        subset.Bl_j = {l: set(subset.B) for l in subset.F}
+        subset.V_J = {j for j, fi in zip(subset.B, subset.fi_j) if fi > 0}
+        
+        # Copy parameters
+        subset.Ht = self.Ht
+        subset.Htt = self.Htt
+        subset.Np = self.Np
+        subset.mo = self.mo
+        subset.bs = self.bs
+        subset.md = self.md
+        subset.pa = self.pa
+        
+        return subset        
+
+    def save(self, directory: str = 'instances'):
+        os.makedirs(directory, exist_ok=True)
+        sizes = f"{len(self.B)}_{len(self.F)}_{len(self.T)}"
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        filename = f"{directory}/instance_{self.Name}_{sizes}_{timestamp}.pkl"
         with open(filename, 'wb') as f:
             pickle.dump(self, f)
-
+        return filename
+        
     def visualize_instance(self): 
         print(f"Blocks (B): {self.B}")
         print(f"Fronts (F): {self.F}")
