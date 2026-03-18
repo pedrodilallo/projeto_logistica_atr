@@ -4,6 +4,7 @@ from pyomo.environ import *
 from pyomo.opt import SolverFactory
 from pyomo.opt import TerminationCondition, SolverStatus
 import numpy as np
+import os
 from datetime import datetime
 class GLSP_model():
 
@@ -11,7 +12,17 @@ class GLSP_model():
         self.instance = instance
         self.model = ConcreteModel()
         self.model.Name = instance.Name + "_model" 
-        
+
+        self.INDEX_SCHEMA = {
+        "x":     ("l", "j", "s"),
+        "y":     ("l", "j", "s"),
+        "z":     ("l", "i", "j", "s"),
+        "wm":    (),
+        "wb":    ("j",),
+        "theta": (),
+        "alpha": (),
+        "beta":  ("j",),}
+
         self.build_params()
         print("Params ok!")
         self.build_vars()
@@ -68,6 +79,7 @@ class GLSP_model():
 
         def x_bounds(model,l, j,s):
             return (0, model.p_j[j])
+        
         model.x = pyo.Var(model.F, model.B, model.S, within=NonNegativeReals,bounds=x_bounds) # type: ignore
         
         model.y = pyo.Var(model.F, model.B, model.S, within=Binary) # type: ignore
@@ -196,8 +208,8 @@ class GLSP_model():
 
         self.model = model
 
-    def uncertainty(self,gamma,delta):
-        Gamma = [gamma for _ in range(len(self.model.T))]
+    def uncertainty(self,gamma: float,delta: float):
+        Gamma = [np.ceil(gamma*len(self.model.Bs_j[t])) for _ in range(len(self.model.T))] 
         ATR_deviation = np.zeros((len(self.model.B),len(self.model.T)))
         for j in self.model.B: 
             for t in self.model.T: 
@@ -225,46 +237,63 @@ class GLSP_model():
 
 
         model.del_component(model.objective)
-        model.objective = Objective(expr=( - theta + \
+        model.objective = Objective(expr= - theta + \
             mo*sum(wm[t] for t in T) + \
             bs*sum(wb[j] for j in B) + \
-            md*sum(dist_ij[i, j] * z[l, i, j,s] for l in F for i in B for j in B for s in S) ), sense=minimize)
+            md*sum(dist_ij[i, j] * z[l, i, j,s] for l in F for i in B for j in B for t in T for s in S_t[t]), sense=minimize)
 
         model.obj_revenue = ConstraintList()
 
         if max(Gamma) == 0:
             # DETERMINISTIC
             print("DETERMINISTIC")
-            model.obj_revenue.add(expr=( theta == pa*sum(self.model.ATR_jt[j,t] * sum(x[l,j,s] for l in F for s in S) for j in B for t in T) ))
+            model.obj_revenue.add(expr=( theta == pa*sum(self.model.ATR_jt[j,t] * sum([x[l,j,s] for l in F for s in S_t[t]]) for j in B for t in T) ))
         
         elif max(Gamma) == -1:
             # WORST-CASE (SOYSTER)
             print("WORST-CASE (SOYSTER)")
-            model.obj_revenue.add(expr=( theta == pa*sum( (self.model.ATR_jt[j,t] - ATR_deviation[j,t]) * sum(x[l,j,s] for l in F for s in S) for j in B for t in T) ))
+            model.obj_revenue.add(expr=( theta == pa*sum( (self.model.ATR_jt[j,t] - ATR_deviation[j,t]) * sum(x[l,j,s] for l in F for s in S_t[t]) for j in B for t in T) ))
 
         elif max(Gamma) > 0:
             # ROBUST
             print("ROBUST")
             model.obj_revenue.add(expr=( theta <= pa*( \
-                sum(self.model.ATR_jt[j,t] * sum(x[l,j,s] for l in F for s in S) for j in B for t in T) - \
+                sum(self.model.ATR_jt[j,t] * sum(x[l,j,s] for l in F for s in S_t[t]) for j in B for t in T) - \
                 sum(beta[j,t] for j in B for t in T) - \
-                sum( Gamma[t-1]*alpha[t] for t in T) ) ) )
+                sum(Gamma[t-1]*alpha[t] for t in T) ) ) )
             
             for j in B:
                 for t in T:
-                    model.obj_revenue.add(expr=( alpha[t] + beta[j,t] >= ATR_deviation[j,t] * sum(x[l,j,s] for l in F for s in S) ) )
+                    model.obj_revenue.add(expr=( alpha[t] + beta[j,t] >= ATR_deviation[j,t] * sum(x[l,j,s] for l in F for s in S_t[t]) ) )
 
 
 
         self.model = model
+
+
+    def _var_rows(self,var_obj):
+        schema = self.INDEX_SCHEMA.get(var_obj.name, ())
+        def row(idx, var_data):
+            idx_t = () if idx is None else (idx,) if not isinstance(idx, tuple) else idx
+            r = {k: "no_index" for k in ("i", "j", "l", "s")}
+            r.update(zip(schema, idx_t))
+            return {"variable_name": var_obj.name, **r, "value": pyo.value(var_data, exception=False)}
+        return [row(idx, vd) for idx, vd in var_obj.items()]
+
+    def save_variables_to_csv(self):
+        os.makedirs("model_variables_csv", exist_ok=True)
+        rows = [r for v in self.model.component_objects(pyo.Var, active=True) for r in self._var_rows(v)]
+        pd.DataFrame(rows, columns=["variable_name","i","j","l","s","value"]) \
+        .to_csv(f"model_variables_csv/{self.instance.Name}.csv", index=False)
+
     
-    def solve(self,TimeLim: float = 3600 ,MemLim: float = 13.2,log: bool = True):
+    def solve(self,TimeLim: float = 3600 ,MemLim: float = 13.2,log: bool = True, logfile : str = 'logs/Unnamed'):
         
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         solver = pyo.SolverFactory('gurobi_persistent')
         solver.options['TimeLimit'] = TimeLim  
         solver.options['SoftMemLimit'] = MemLim
-        solver.options['LogFile'] = f"logs/log_gurobi_{len(self.model.B)}B_{timestamp}.log"
+        solver.options['LogFile'] = logfile
         solver.set_instance(self.model) 
 
         if log:

@@ -138,7 +138,7 @@ class Instance:
         self.st_ij = self.dist_ij / speed
         
         # Calculate distances to mill (at origin)
-        mill_coord = np.array([0.0, 0.0])
+        mill_coord = np.array([50.0, 50.0])
         dist_to_mill = np.sqrt(np.sum((self.coords - mill_coord) ** 2, axis=1))
         dist_to_mill = np.maximum(dist_to_mill, 0.1)
         truck_capacity = kwargs.get('truck_capacity', 60.0)
@@ -146,27 +146,26 @@ class Instance:
         self.transp_j = (truck_capacity * speed) / (round_trip_factor * dist_to_mill)
         
         # Demands
-        mind_val = kwargs.get('mind_t_val', 210_000)
-        self.mind_t = [float(mind_val) for _ in self.T]
-
-        maxd_t_offset = kwargs.get('maxd_t_offset', 210_000*0.3)
-        self.maxd_t = [mind + maxd_t_offset for mind in self.mind_t]
+        mind_t_val = (np.sum(self.p_j) / size_T) * 0.70 # FIXED
+        self.mind_t = [float(mind_t_val)] * size_T
+        self.maxd_t = [float(mind_t_val * 1.30)] * size_T
 
         # vin_t
-        self.vin_t = np.full(size_T, 0.2 * (sum(self.TCH_j / self.p_j)) / size_T if size_T > 0 else 0).tolist()
+        self.vin_t = np.full(size_T, 0.2 * np.mean(self.p_j / self.TCH_j) * 0.10).tolist()
         
         # ATR
         self.ATR_jt = np.zeros((size_B, size_T))
-        atr_mean = kwargs.get('ATR_jt_mean', 0.8)
-        atr_spread = kwargs.get('ATR_jt_spread', 0.15)
+        atr_mean = kwargs.get('ATR_jt_mean', 0.147)
+        atr_spread_down = kwargs.get('ATR_jt_spread_down', 0.052)
+        atr_spread_up = kwargs.get('ATR_jt_spread_up', 0.016)
         for j in self.B:
             start_j, end_j = harvest_window_j[j]
             for t in self.T:
                 if start_j <= t <= end_j:
                     self.ATR_jt[j - 1, t - 1] = self.rng.triangular(
-                        atr_mean - atr_spread,
+                        atr_mean - atr_spread_down,
                         atr_mean,
-                        atr_mean + atr_spread)
+                        atr_mean + atr_spread_up)
 
         Ht = kwargs.get('Ht', 10)
         self.K_t = [float(20 * Ht) for _ in self.T] # 20 operating days per period                 
@@ -182,16 +181,16 @@ class Instance:
             
         self.Nm_l = [5 for _ in range(size_F)]
         self.V_J = {j for j, fi in zip(self.B, self.fi_j) if fi > 0}
-        self.Bl_j = {l: set(self.rng.choice(self.B,size=int(self.rng.integers(int(np.ceil(size_B * 0.5)), size_B + 1)),replace=False).tolist()) for l in self.F} #changed logic to all into .rng for more consistency
+        self.Bl_j = {l: set(self.rng.choice(self.B,size=int(self.rng.integers(int(np.ceil(size_B * 0.5)), size_B + 1)),replace=False).tolist()) for l in self.F} 
 
         self.Ht = Ht
-        self.N_t = kwargs.get('N_t', {x: 10 for x in range(1, size_T + 1)})
+        self.N_t = kwargs.get('N_t', {x: 100 for x in range(1, size_T + 1)})
         self.Htt = kwargs.get('Htt', 10)
-        self.Np = kwargs.get('Np', size_F)
-        self.mo = kwargs.get('mo', 10.0)
-        self.bs = kwargs.get('bs', 5.0)
-        self.md = kwargs.get('md', 1.0)
-        self.pa = kwargs.get('pa', 2.0)
+        self.Np = kwargs.get('Np', 10)
+        self.mo = kwargs.get('mo', 311) # per ton of cane
+        self.bs = kwargs.get('bs', 168) # per ton of cane
+        self.md = kwargs.get('md', 25) # per km
+        self.pa = kwargs.get('pa', 2112) #R$/ton of ATR, not CANE
 
         return self
             

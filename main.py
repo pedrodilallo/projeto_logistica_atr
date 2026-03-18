@@ -1,3 +1,4 @@
+from copy import copy
 import os
 import re
 import solutions
@@ -21,23 +22,23 @@ from model import GLSP_model
 
 def generate_hierarchy(base_seed: int = 2002):
 
-    inst_190 = Instance(name="190B", seed=base_seed)
-    inst_190.generate(size_B=190, size_F=3, size_T=10, seed=base_seed)
-    print(f"190B: {len(inst_190.B)} blocks, {np.sum(inst_190.p_j):.0f} tons")
+    inst_150_3F = Instance(name="150B_3F", seed=base_seed)
+    inst_150_3F.generate(size_B=150, size_F=3, size_T=10, seed=base_seed)
+    print(f"150B_3F: {len(inst_150_3F.B)} blocks, {np.sum(inst_150_3F.p_j):.0f} tons")
 
-    inst_140 = inst_190.create_subset(140, "140B", seed=base_seed + 3)
-    inst_140.name = "140B"
-    print(f"140B: {len(inst_140.B)} blocks, {np.sum(inst_140.p_j):.0f} tons")
-    
-    inst_90 = inst_140.create_subset(90, "90B", seed=base_seed + 3)
-    inst_90.name = "90B"
-    print(f"90B: {len(inst_90.B)} blocks, {np.sum(inst_90.p_j):.0f} tons")
+    inst_100_3F = inst_150_3F.create_subset(100, "100B_3F", seed=base_seed)
+    inst_100_3F.name = "100B_3F"
+    print(f"100B: {len(inst_100_3F.B)} blocks, {np.sum(inst_100_3F.p_j):.0f} tons")    
 
-    inst_40 = inst_90.create_subset(40, "40B", seed=base_seed + 3)
-    inst_40.name = "40B"
-    print(f"40B: {len(inst_40.B)} blocks, {np.sum(inst_40.p_j):.0f} tons")    
+    inst_150_6F = Instance(name="150B_6F", seed=base_seed)
+    inst_150_6F.generate(size_B=150, size_F=6, size_T=10, seed=base_seed)
+    print(f"150B_3F: {len(inst_150_6F.B)} blocks, {np.sum(inst_150_6F.p_j):.0f} tons")
 
-    return  inst_190,inst_140, inst_90,inst_40
+    inst_100_6F = inst_150_6F.create_subset(100, "100B_6F", seed=base_seed)
+    inst_100_6F.name = "100B_3F"
+    print(f"100B: {len(inst_100_6F.B)} blocks, {np.sum(inst_100_6F.p_j):.0f} tons")    
+
+    return inst_150_3F, inst_100_3F, inst_150_6F, inst_100_6F
 
 
 def save_vars_csv(model, instance_name, directory="model_variables_test_size"):
@@ -56,18 +57,28 @@ def save_vars_csv(model, instance_name, directory="model_variables_test_size"):
     
     pd.DataFrame(rows).to_csv(path, index=False)
 
-instance_list = generate_hierarchy()
 i = 0
 all_stats = {}
-for instance in instance_list:
-    instance.save(directory="size_test_instances2")
-    print(instance.Name)
 
-    model = GLSP_model(instance)
-    results, stats = model.solve(TimeLim = 7200)  
-    delta = 0
-    all_stats[instance.Name] = stats
-    print(stats)
+with open('instance_files/instance_150B_6F_150_6_10_20260310231330.pkl', 'rb') as f:
+    instance = pickle.load(f)
+
+for theta in [0.1,0.2,0.3]:
+    for gamma in [0.25,0.5,0.75]:
+        
+        inst = copy(instance)
+        inst.Name = str(instance.Name) + f"Robust_gamma_{gamma}_theta{theta}".replace('.','d')
+        print(inst.Name)
+
+        model = GLSP_model(inst)
+        Gamma,ATR_deviation = model.uncertainty(gamma,theta)
+        model.robustness(Gamma,ATR_deviation)
+        results, stats = model.solve(TimeLim = 3600,logfile = f"logs/{inst.Name}.log")
+  
+        model.save_variables_to_csv()
+        delta = 0
+        all_stats[instance.Name] = stats
+        print(stats)
 
 all_stats = pd.DataFrame(all_stats)
-all_stats.to_csv('logs/full_stats_batch_1_testing_time.csv')
+all_stats.to_csv('logs/full_stats_batch_3_testing_time.csv')
