@@ -107,7 +107,7 @@ class GLSP_model():
         model = self.model
         
         # Objective 
-        model.objective = Objective(expr=(model.mo * sum(model.wm[t]  for t in model.T) +model.bs*sum(model.wb[j] for j in model.B) +model.md*sum(model.dist_ij[i, j] * model.z[l, i, j,s] for l in model.F for i in model.B for j in model.B for s in model.S) - model.pa*sum(model.ATR_jt[j,t]*sum(model.x[l,j,s] for l in model.F for s in model.S_t[t]) for j in model.B for t in model.T)), sense=minimize)
+        model.objective = Objective(expr=(model.pa*sum(model.ATR_jt[j,t]*sum(model.x[l,j,s] for l in model.F for s in model.S_t[t]) for j in model.B for t in model.T) - (model.mo * sum(model.wm[t]  for t in model.T) + model.bs*sum(model.wb[j] for j in model.B) + model.md*sum(model.dist_ij[i, j] * model.z[l, i, j,s] for l in model.F for i in model.B for j in model.B for s in model.S))), sense=maximize)
         print("OBJ OK")
 
         #2 & 3
@@ -237,17 +237,15 @@ class GLSP_model():
 
 
         model.del_component(model.objective)
-        model.objective = Objective(expr= - theta + \
+        model.objective = Objective(expr=  theta - (\
             mo*sum(wm[t] for t in T) + \
             bs*sum(wb[j] for j in B) + \
-            md*sum(dist_ij[i, j] * z[l, i, j,s] for l in F for i in B for j in B for t in T for s in S_t[t]), sense=minimize)
+            md*sum(dist_ij[i, j] * z[l, i, j,s] for l in F for i in B for j in B for t in T for s in S_t[t])), sense=maximize)
 
         model.obj_revenue = ConstraintList()
 
         if max(Gamma) == 0:
-            # DETERMINISTIC
-            print("DETERMINISTIC")
-            model.obj_revenue.add(expr=( theta == pa*sum(self.model.ATR_jt[j,t] * sum([x[l,j,s] for l in F for s in S_t[t]]) for j in B for t in T) ))
+            raise ValueError ('LOAD DETERMINISC MODEL')
         
         elif max(Gamma) == -1:
             # WORST-CASE (SOYSTER)
@@ -260,13 +258,11 @@ class GLSP_model():
             model.obj_revenue.add(expr=( theta <= pa*( \
                 sum(self.model.ATR_jt[j,t] * sum(x[l,j,s] for l in F for s in S_t[t]) for j in B for t in T) - \
                 sum(beta[j,t] for j in B for t in T) - \
-                sum(Gamma[t-1]*alpha[t] for t in T) ) ) )
+                sum(Gamma[t-1]*alpha[t] for t in T) ) ) ) # no need make a constraint saying theta >= 0, because the bound was established on variable definition. 
             
             for j in B:
                 for t in T:
-                    model.obj_revenue.add(expr=( alpha[t] + beta[j,t] >= ATR_deviation[j,t] * sum(x[l,j,s] for l in F for s in S_t[t]) ) )
-
-
+                    model.obj_revenue.add(expr=( alpha[t] + beta[j,t] >= ATR_deviation[j,t] * sum(x[l,j,s] for l in F for s in S_t[t]) ) ) # LB for both defined at variable definition
 
         self.model = model
 
