@@ -46,7 +46,7 @@ os.makedirs("model_variables_csv", exist_ok=True)
 
 inst_150_3F, inst_100_3F, inst_150_6F, inst_100_6F = generate_hierarchy()
  
-BASE_INSTANCES = [inst_150_3F, inst_100_3F]
+BASE_INSTANCES = [inst_150_3F, inst_150_6F, inst_100_6F]
 
 for base_instance in BASE_INSTANCES:
     print(f"Deterministic: {base_instance.Name}  |  {len(base_instance.B)} blocks")
@@ -54,7 +54,7 @@ for base_instance in BASE_INSTANCES:
     inst.Name = f"{base_instance.Name}_deterministic"
  
     model = GLSP_model(inst)
-    results, stats = model.solve(TimeLim=3600, logfile=f"logs/{inst.Name}")
+    results, stats = model.solve(TimeLim=400, logfile=f"logs/{inst.Name}")
  
     print(stats)
     model.save_variables_to_csv()

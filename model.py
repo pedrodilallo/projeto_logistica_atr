@@ -219,7 +219,7 @@ class GLSP_model():
         self.gamma = gamma
         self.theta = delta
 
-        Gamma = [np.ceil(gamma*len(self.model.Bs_j[t])) for _ in range(len(self.model.T))] 
+        Gamma = [np.ceil(gamma*len(self.model.Bs_j[t])) for t  in self.model.T] 
         ATR_deviation = np.zeros((len(self.model.B),len(self.model.T)))
         for j in self.model.B: 
             for t in self.model.T: 
