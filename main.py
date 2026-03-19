@@ -40,45 +40,54 @@ def generate_hierarchy(base_seed: int = 2002):
 
     return inst_150_3F, inst_100_3F, inst_150_6F, inst_100_6F
 
+os.makedirs("logs", exist_ok=True)
+os.makedirs("instance_files", exist_ok=True)
+os.makedirs("model_variables_csv", exist_ok=True)
 
-def save_vars_csv(model, instance_name, directory="model_variables_test_size"):
-    os.makedirs(directory, exist_ok=True)
-    path = os.path.join(directory, f"{instance_name}_variables.csv")
-    
-    rows = []
-    for var in model.component_objects(pyo.Var, active=True):
-        for index in var:
-            val = pyo.value(var[index], exception=False)
-            if val is None or abs(val) <= 1e-6:
-                continue
-            idx = list(index) if isinstance(index, tuple) else ([index] if index is not None else [])
-            idx += ["-"] * (4 - len(idx))
-            rows.append({"variable": var.name, "idx_1": idx[0], "idx_2": idx[1], "idx_3": idx[2], "idx_4": idx[3], "value": val})
-    
-    pd.DataFrame(rows).to_csv(path, index=False)
+inst_150_3F, inst_100_3F, inst_150_6F, inst_100_6F = generate_hierarchy()
+ 
+BASE_INSTANCES = [inst_150_3F, inst_100_3F]
 
-i = 0
-all_stats = {}
+for base_instance in BASE_INSTANCES:
+    print(f"Deterministic: {base_instance.Name}  |  {len(base_instance.B)} blocks")
+    inst = copy(base_instance)
+    inst.Name = f"{base_instance.Name}_deterministic"
+ 
+    model = GLSP_model(inst)
+    results, stats = model.solve(TimeLim=3600, logfile=f"logs/{inst.Name}")
+ 
+    print(stats)
+    model.save_variables_to_csv()
+    model.append_to_master_csv(stats, directory='logs', filename='all_results.csv')
 
-with open('instance_files/instance_150B_6F_150_6_10_20260310231330.pkl', 'rb') as f:
-    instance = pickle.load(f)
+for base_instance in BASE_INSTANCES:
+    print(f"\n{'='*60}")
+    print(f"Robust base: {base_instance.Name}  |  {len(base_instance.B)} blocks")
+ 
+    for theta in [0.1, 0.2, 0.3]:
+        for gamma in [0.25, 0.5, 0.75]:
+ 
+            inst = copy(base_instance)
+            run_tag = f"gamma_{gamma}_theta_{theta}".replace('.', 'd')
+            inst.Name = f"{base_instance.Name}_robust_{run_tag}"
+            print(f"\n  Running: {inst.Name}")
+ 
+            model = GLSP_model(inst)
 
-for theta in [0.1,0.2,0.3]:
-    for gamma in [0.25,0.5,0.75]:
-        
-        inst = copy(instance)
-        inst.Name = str(instance.Name) + f"Robust_gamma_{gamma}_theta{theta}".replace('.','d')
-        print(inst.Name)
-
-        model = GLSP_model(inst)
-        Gamma,ATR_deviation = model.uncertainty(gamma,theta)
-        model.robustness(Gamma,ATR_deviation)
-        results, stats = model.solve(TimeLim = 3600,logfile = f"logs/{inst.Name}.log")
-  
-        model.save_variables_to_csv()
-        delta = 0
-        all_stats[instance.Name] = stats
-        print(stats)
-
-all_stats = pd.DataFrame(all_stats)
-all_stats.to_csv('logs/full_stats_batch_3_testing_time.csv')
+            Gamma, ATR_deviation = model.uncertainty(gamma, theta)
+            model.robustness(Gamma, ATR_deviation)
+ 
+            inst.ATR_deviation = ATR_deviation
+            inst.Gamma         = Gamma
+            inst.gamma_param   = gamma
+            inst.theta_param   = theta
+            inst.save(directory='instance_files')
+ 
+            results, stats = model.solve(
+                TimeLim=3600,
+                logfile=f"logs/{inst.Name}")
+ 
+            print(stats)
+            model.save_variables_to_csv()
+            model.append_to_master_csv(stats, directory='logs', filename='all_results.csv')
+ 

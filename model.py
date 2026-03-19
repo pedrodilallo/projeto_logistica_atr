@@ -6,22 +6,29 @@ from pyomo.opt import TerminationCondition, SolverStatus
 import numpy as np
 import os
 from datetime import datetime
+import time 
 class GLSP_model():
 
     def __init__(self,instance) -> None:
+        self.Robust = False
+        self.wall_start = time.perf_counter()
         self.instance = instance
         self.model = ConcreteModel()
         self.model.Name = instance.Name + "_model" 
 
         self.INDEX_SCHEMA = {
-        "x":     ("l", "j", "s"),
-        "y":     ("l", "j", "s"),
-        "z":     ("l", "i", "j", "s"),
-        "wm":    (),
-        "wb":    ("j",),
-        "theta": (),
-        "alpha": (),
-        "beta":  ("j",),}
+            "x":     ("l", "j", "s"),
+            "y":     ("l", "j", "s"),
+            "z":     ("l", "i", "j", "s"),
+            "wm":    ("t",),
+            "wb":    ("j",),
+            "theta": (),
+            "alpha": ("t",),
+            "beta":  ("j", "t")}
+        
+        self._run_stem = None
+        self.gamma = None
+        self.theta = None
 
         self.build_params()
         print("Params ok!")
@@ -209,6 +216,9 @@ class GLSP_model():
         self.model = model
 
     def uncertainty(self,gamma: float,delta: float):
+        self.gamma = gamma
+        self.theta = delta
+
         Gamma = [np.ceil(gamma*len(self.model.Bs_j[t])) for _ in range(len(self.model.T))] 
         ATR_deviation = np.zeros((len(self.model.B),len(self.model.T)))
         for j in self.model.B: 
@@ -263,39 +273,47 @@ class GLSP_model():
             for j in B:
                 for t in T:
                     model.obj_revenue.add(expr=( alpha[t] + beta[j,t] >= ATR_deviation[j,t] * sum(x[l,j,s] for l in F for s in S_t[t]) ) ) # LB for both defined at variable definition
-
+        self.Robust = True
         self.model = model
 
 
     def _var_rows(self,var_obj):
         schema = self.INDEX_SCHEMA.get(var_obj.name, ())
+        
         def row(idx, var_data):
             idx_t = () if idx is None else (idx,) if not isinstance(idx, tuple) else idx
-            r = {k: "no_index" for k in ("i", "j", "l", "s")}
+            r = {k: "no_index" for k in ("i", "j", "l", "s", "t")}
             r.update(zip(schema, idx_t))
             return {"variable_name": var_obj.name, **r, "value": pyo.value(var_data, exception=False)}
+        
         return [row(idx, vd) for idx, vd in var_obj.items()]
 
     def save_variables_to_csv(self):
         os.makedirs("model_variables_csv", exist_ok=True)
-        rows = [r for v in self.model.component_objects(pyo.Var, active=True) for r in self._var_rows(v)]
-        pd.DataFrame(rows, columns=["variable_name","i","j","l","s","value"]) \
-        .to_csv(f"model_variables_csv/{self.instance.Name}.csv", index=False)
+        
+        stem = (os.path.basename(self._run_stem)
+                if self._run_stem else self.instance.Name)
+        
+        path = os.path.join('model_variables_csv', stem + ".csv")
 
+        rows = [r for v in self.model.component_objects(pyo.Var, active=True) for r in self._var_rows(v)]
+        pd.DataFrame(rows, columns=["variable_name", "i", "j", "l", "s", "t", "value"]).to_csv(path, index=False)
+
+        print(f"Variables saved → {path}")
     
     def solve(self,TimeLim: float = 3600 ,MemLim: float = 13.2,log: bool = True, logfile : str = 'logs/Unnamed'):
         
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        date_str  = datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
+        run_stem  = f"{logfile}_{date_str}"
+        self._run_stem = run_stem
+        
         solver = pyo.SolverFactory('gurobi_persistent')
         solver.options['TimeLimit'] = TimeLim  
         solver.options['SoftMemLimit'] = MemLim
-        solver.options['LogFile'] = logfile
+        solver.options['LogFile'] = run_stem + ".log"
         solver.set_instance(self.model) 
 
-        if log:
-            results = solver.solve(self.model, tee=True, load_solutions = False,logfile=f'logs/log_gurobi_{len(self.model.B)}B.log')
-        else: 
-            results = solver.solve(self.model, tee=True, load_solutions = False)
+        results = solver.solve(self.model, tee=True, load_solutions = False)
 
         if solver._solver_model.Status == 17:  # Memory limit reached (pyomo does not handle this alone)
             results.solver.termination_condition = TerminationCondition.resourceInterrupt
@@ -304,14 +322,52 @@ class GLSP_model():
         self.model.solutions.load_from(results)
 
         grb = solver._solver_model
-        stats = { 
-                'objective_value': grb.ObjVal if grb.SolCount > 0 else None,
-                'termination_condition': str(results.solver.termination_condition),
-                'number_of_variables': self.model.nvariables(),
-                'number_of_constraints': self.model.nconstraints(),
-                'mip_gap': grb.MIPGap if hasattr(grb, 'MIPGap') else None,
-                'runtime': grb.Runtime,
-                'best_bound': grb.ObjBound,
-                'node_count': results.solver.statistics.get('branch_and_bound', {}).get('nodes', None),}
+        stats = {
+            'instance_name':          self.instance.Name,
+            'theta': 0,
+            'gamma': 0,
+            'objective_value':        grb.ObjVal if grb.SolCount > 0 else None,
+            'termination_condition':  str(results.solver.termination_condition),
+            'number_of_variables':    self.model.nvariables(),
+            'number_of_constraints':  self.model.nconstraints(),
+            'mip_gap':                grb.MIPGap if hasattr(grb, 'MIPGap') else None,
+            'solver_time_s':          grb.Runtime,
+            'total_wall_time_s':      round(time.perf_counter() - self.wall_start, 2),
+            'best_bound':             grb.ObjBound,
+            'node_count':             results.solver.statistics.get(
+                                          'branch_and_bound', {}).get('nodes', None),}
+
+        if self.Robust:
+            stats['theta'] = self.theta
+            stats['gamma'] = self.gamma        
         
         return (results,stats)
+
+    def _compute_component_stats(self) -> dict:
+        model = self.model
+ 
+        milling_loss = sum(pyo.value(model.wm[t], exception=False) or 0.0 for t in model.T)
+ 
+        standover = sum(pyo.value(model.wb[j], exception=False) or 0.0 for j in model.B)
+ 
+        total_distance = sum( pyo.value(model.dist_ij[i, j]) * (pyo.value(model.z[l, i, j, s], exception=False) or 0.0) for l in model.F for i in model.B for j in model.B for s in model.S)
+ 
+        revenue = pyo.value(model.pa) * sum( pyo.value(model.ATR_jt[j, t]) * sum(pyo.value(model.x[l, j, s], exception=False) or 0.0 for l in model.F for s in model.S_t[t]) for j in model.B for t in model.T)
+ 
+        return {'milling_loss_t':      milling_loss,
+            'standover_t':         standover,
+            'total_distance_km':   total_distance,
+            'atr_revenue':         revenue,}
+    
+    def append_to_master_csv(self, stats: dict, directory: str = "logs", filename: str = "all_results.csv"):
+
+        os.makedirs(directory, exist_ok=True)
+        path = os.path.join(directory, filename)
+        df  = pd.DataFrame([stats])
+ 
+        if not os.path.exists(path):
+            df.to_csv(path, mode="w", header=True, index=False)
+            print(f"Master results file created: {path}")
+        else:
+            df.to_csv(path, mode="a", header=False, index=False)
+            print(f"Master results file updated: {path}")
