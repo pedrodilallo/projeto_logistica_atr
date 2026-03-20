@@ -1,0 +1,38 @@
+
+Gurobi 13.0.1 (linux64) logging started Fri Mar 20 19:44:33 2026
+
+Set parameter LogFile to value "logs/130B_6F_deterministic_2026-03-20_19h42m51s.log"
+Set parameter Threads to value 1
+Gurobi Optimizer version 13.0.1 build v13.0.1rc0 (linux64 - "Linux Mint 22")
+
+CPU model: 12th Gen Intel(R) Core(TM) i7-12700, instruction set [SSE2|AVX|AVX2]
+Thread count: 20 physical cores, 20 logical processors, using up to 1 threads
+
+Non-default parameters:
+TimeLimit  400
+SoftMemLimit  10
+Threads  1
+
+Optimize a model with 186170 rows, 5148140 columns and 15495676 nonzeros (Max)
+Model fingerprint: 0x9d63089d
+Model has 5050640 linear objective coefficients
+Variable types: 39140 continuous, 5109000 integer (5109000 binary)
+Coefficient statistics:
+  Matrix range     [8e-05, 2e+04]
+  Objective range  [1e+01, 3e+03]
+  Bounds range     [1e+00, 1e+05]
+  RHS range        [1e+00, 1e+05]
+
+Presolve removed 113282 rows and 4183338 columns
+Presolve time: 3.31s
+Presolved: 72888 rows, 964802 columns, 3023907 nonzeros
+Variable types: 15275 continuous, 949527 integer (949527 binary)
+Found heuristic solution: objective -5.15326e+08
+Performing another presolve...
+Presolve removed 12138 rows and 10 columns (presolve time = 5s)...
+Presolve removed 12138 rows and 10 columns (presolve time = 10s)...
+Presolve removed 12138 rows and 10 columns (presolve time = 15s)...
+Presolve removed 12138 rows and 10 columns (presolve time = 20s)...
+Presolve removed 12138 rows and 10 columns (presolve time = 25s)...
+Presolve removed 12138 rows and 10 columns (presolve time = 30s)...
+Presolve removed 12138 rows and 10 columns (presolve time = 35s)...

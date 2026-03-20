@@ -301,7 +301,7 @@ class GLSP_model():
 
         print(f"Variables saved → {path}")
     
-    def solve(self,TimeLim: float = 3600 ,MemLim: float = 10,log: bool = True, logfile : str = 'logs/Unnamed'):
+    def solve(self,TimeLim: float = 3600 ,MemLim: float = 12,log: bool = True, logfile : str = 'logs/Unnamed'):
         
         date_str  = datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
         run_stem  = f"{logfile}_{date_str}"
@@ -311,6 +311,7 @@ class GLSP_model():
         solver.options['TimeLimit'] = TimeLim  
         solver.options['SoftMemLimit'] = MemLim
         solver.options['LogFile'] = run_stem + ".log"
+        solver.options['Threads'] = 1
         solver.set_instance(self.model) 
 
         results = solver.solve(self.model, tee=True, load_solutions = False)
@@ -340,7 +341,6 @@ class GLSP_model():
         if self.Robust:
             stats['theta'] = self.theta
             stats['gamma'] = self.gamma        
-        
         return (results,stats)
 
     def _compute_component_stats(self) -> dict:

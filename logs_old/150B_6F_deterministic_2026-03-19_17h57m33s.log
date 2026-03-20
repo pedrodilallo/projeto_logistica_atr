@@ -1,0 +1,25 @@
+
+Gurobi 13.0.1 (linux64) logging started Thu Mar 19 17:59:47 2026
+
+Set parameter LogFile to value "logs/150B_6F_deterministic_2026-03-19_17h57m33s.log"
+Gurobi Optimizer version 13.0.1 build v13.0.1rc0 (linux64 - "Linux Mint 22")
+
+CPU model: 12th Gen Intel(R) Core(TM) i7-12700, instruction set [SSE2|AVX|AVX2]
+Thread count: 20 physical cores, 20 logical processors, using up to 20 threads
+
+Non-default parameters:
+TimeLimit  400
+SoftMemLimit  13.2
+
+Optimize a model with 214750 rows, 6840160 columns and 20548898 nonzeros (Max)
+Model fingerprint: 0x8b12b408
+Model has 6727780 linear objective coefficients
+Variable types: 45160 continuous, 6795000 integer (6795000 binary)
+Coefficient statistics:
+  Matrix range     [8e-05, 2e+04]
+  Objective range  [8e+00, 3e+03]
+  Bounds range     [1e+00, 1e+05]
+  RHS range        [1e+00, 1e+05]
+
+Presolve removed 51791 rows and 97165 columns (presolve time = 5s)...
+Presolve removed 51791 rows and 97165 columns (presolve time = 52s)...
