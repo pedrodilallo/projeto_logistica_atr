@@ -82,7 +82,7 @@ class GLSP_model():
 
         self.model = model
 
-    def build_vars(self):
+    def build_vars(self,sparse = False):
         model = self.model
 
         def x_bounds(model,l, j,s):
@@ -110,6 +110,12 @@ class GLSP_model():
                             model.y[l,j,s].fix(0)
                             fixed_y.add((l, j, s))
         
+        if not sparse:
+            model.z = pyo.Var(model.F,model.B,model.B,model.S, within=Binary)
+            self.model = model
+            
+            return
+
         # (l,j) onde y[l,j,s] is NOT fixed to 0
         active_lj_s: dict = {}
         for l in model.F: 
@@ -261,11 +267,11 @@ class GLSP_model():
 
         self.model = model
 
-    def uncertainty(self,gamma: float,delta: float):
+    def uncertainty(self,gamma: float):
         self.gamma = gamma
-        self.theta = delta
+        self.theta = (0.147 - 0.095)
 
-        Gamma = [np.ceil(gamma*len(self.model.Bs_j[t])) for _ in range(len(self.model.T))] 
+        Gamma = [np.ceil(gamma*len(self.model.Bs_j[t])) for t  in self.model.T] 
         ATR_deviation = np.zeros((len(self.model.B),len(self.model.T)))
         for j in self.model.B: 
             for t in self.model.T: 
@@ -347,7 +353,7 @@ class GLSP_model():
 
         print(f"Variables saved → {path}")
     
-    def solve(self,TimeLim: float = 3600 ,MemLim: float = 13.2,log: bool = True, logfile : str = 'logs/Unnamed'):
+    def solve(self,TimeLim: float = 3600 ,MemLim: float = 10,log: bool = True, logfile : str = 'logs/Unnamed'):
         
         date_str  = datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
         run_stem  = f"{logfile}_{date_str}"
@@ -387,23 +393,21 @@ class GLSP_model():
             stats['theta'] = self.theta
             stats['gamma'] = self.gamma        
         
-        return (results,stats)
 
-    def _compute_component_stats(self) -> dict:
-        model = self.model
+        milling_loss = sum(pyo.value(self.model.wm[t], exception=False) or 0.0 for t in self.model.T)
  
-        milling_loss = sum(pyo.value(model.wm[t], exception=False) or 0.0 for t in model.T)
+        standover = sum(pyo.value(self.model.wb[j], exception=False) or 0.0 for j in self.model.B)
  
-        standover = sum(pyo.value(model.wb[j], exception=False) or 0.0 for j in model.B)
- 
-        total_distance = sum( pyo.value(model.dist_ij[i, j]) * (pyo.value(model.z[l, i, j, s], exception=False) or 0.0) for (l, i, j, s) in model.VALID_Z)
+        total_distance = sum( pyo.value(self.model.dist_ij[i, j]) * (pyo.value(self.model.z[l, i, j, s], exception=False) or 0.0) for (l, i, j, s) in self.model.VALID_Z)
          
-        revenue = pyo.value(model.pa) * sum( pyo.value(model.ATR_jt[j, t]) * sum(pyo.value(model.x[l, j, s], exception=False) or 0.0 for l in model.F for s in model.S_t[t]) for j in model.B for t in model.T)
+        revenue = pyo.value(self.model.pa) * sum( pyo.value(self.model.ATR_jt[j, t]) * sum(pyo.value(self.model.x[l, j, s], exception=False) or 0.0 for l in self.model.F for s in self.model.S_t[t]) for j in self.model.B for t in self.model.T)
  
-        return {'milling_loss_t':      milling_loss,
-            'standover_t':         standover,
-            'total_distance_km':   total_distance,
-            'atr_revenue':         revenue,}
+        stats['milling_loss_t'] =      milling_loss,
+        stats['standover_t'] =         standover,
+        stats['total_distance_km'] =   total_distance,
+        stats['atr_revenue'] =         revenue
+
+        return (results,stats)
     
     def append_to_master_csv(self, stats: dict, directory: str = "logs", filename: str = "all_results.csv"):
 
