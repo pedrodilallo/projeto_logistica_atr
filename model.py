@@ -301,7 +301,7 @@ class GLSP_model():
 
         print(f"Variables saved → {path}")
     
-    def solve(self,TimeLim: float = 3600 ,MemLim: float = 13.2,log: bool = True, logfile : str = 'logs/Unnamed'):
+    def solve(self,TimeLim: float = 3600 ,MemLim: float = 10,log: bool = True, logfile : str = 'logs/Unnamed'):
         
         date_str  = datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
         run_stem  = f"{logfile}_{date_str}"
