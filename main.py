@@ -55,7 +55,7 @@ os.makedirs("model_variables_csv", exist_ok=True)
 
 inst_100_3F, inst_75_3F,inst_50_3F, inst_100_6F, inst_75_6F,inst_50_6F = generate_hierarchy()
 
-BASE_INSTANCES = [inst_100_3F, inst_75_3F,inst_50_3F, inst_100_6F, inst_75_6F,inst_50_6F]
+BASE_INSTANCES = [inst_50_3F,inst_50_6F,inst_75_3F,inst_75_6F,inst_100_3F,inst_100_6F]
 
 for base_instance in BASE_INSTANCES:
     print(f"Deterministic: {base_instance.Name}  |  {len(base_instance.B)} blocks")

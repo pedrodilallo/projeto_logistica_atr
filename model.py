@@ -10,7 +10,7 @@ from datetime import datetime
 import time 
 class GLSP_model():
 
-    def __init__(self,instance) -> None:
+    def __init__(self,instance,sparse=False) -> None:
         self.Robust = False
         self.wall_start = time.perf_counter()
         self.instance = instance
@@ -30,7 +30,8 @@ class GLSP_model():
         self._run_stem = None
         self.gamma = None
         self.theta = None
-
+        self.sparse = False
+        
         self.build_params()
         print("Params ok!")
         self.build_vars()
@@ -110,7 +111,7 @@ class GLSP_model():
                             model.y[l,j,s].fix(0)
                             fixed_y.add((l, j, s))
         
-        if not sparse:
+        if not self.sparse:
             model.z = pyo.Var(model.F,model.B,model.B,model.S, within=Binary)
             self.model = model
             
@@ -213,7 +214,7 @@ class GLSP_model():
 
         model.consistent_movement_on_period_s_minus_list = ConstraintList()
 
-        if sparse:
+        if self.sparse:
             model.objective = Objective(expr=(model.pa*sum(model.ATR_jt[j,t]*sum(model.x[l,j,s] for l in model.F for s in model.S_t[t]) for j in model.B for t in model.T) - (model.mo * sum(model.wm[t]  for t in model.T) + model.bs*sum(model.wb[j] for j in model.B) + model.md*sum(model.dist_ij[i, j] * model.z[l, i, j, s] for (l, i, j, s) in model.VALID_Z))), sense=maximize)
             print("OBJ OK")
 
@@ -395,7 +396,6 @@ class GLSP_model():
         solver.options['TimeLimit'] = TimeLim  
         solver.options['SoftMemLimit'] = MemLim
         solver.options['LogFile'] = run_stem + ".log"
-        solver.options['Threads'] = 1
         solver.set_instance(self.model) 
 
         results = solver.solve(self.model, tee=True, load_solutions = False)
@@ -430,9 +430,12 @@ class GLSP_model():
         milling_loss = sum(pyo.value(self.model.wm[t], exception=False) or 0.0 for t in self.model.T)
  
         standover = sum(pyo.value(self.model.wb[j], exception=False) or 0.0 for j in self.model.B)
- 
-        total_distance = sum( pyo.value(self.model.dist_ij[i, j]) * (pyo.value(self.model.z[l, i, j, s], exception=False) or 0.0) for (l, i, j, s) in self.model.VALID_Z)
-         
+        
+        if self.sparse: 
+            total_distance = sum( pyo.value(self.model.dist_ij[i, j]) * (pyo.value(self.model.z[l, i, j, s], exception=False) or 0.0) for (l, i, j, s) in self.model.VALID_Z)
+        else: 
+            total_distance = sum( pyo.value(self.model.dist_ij[i, j]) * (pyo.value(self.model.z[l, i, j, s], exception=False) or 0.0) for l in self.model.F for i in self.model.B  for j in self.model.B for s in self.model.S )
+        
         revenue = pyo.value(self.model.pa) * sum( pyo.value(self.model.ATR_jt[j, t]) * sum(pyo.value(self.model.x[l, j, s], exception=False) or 0.0 for l in self.model.F for s in self.model.S_t[t]) for j in self.model.B for t in self.model.T)
  
         stats['milling_loss_t'] =      milling_loss,

@@ -1,0 +1,2 @@
+instance_name,theta,gamma,objective_value,termination_condition,number_of_variables,number_of_constraints,mip_gap,solver_time_s,total_wall_time_s,best_bound,node_count,milling_loss_t,standover_t,total_distance_km,atr_revenue
+50B_3F_deterministic,0,0,138127432.4676374,optimal,390060,29970,9.874707938782767e-05,2749.699898004532,2762.06,138141072.1481769,,"(302271.6999999999,)","(0.0,)","(794.8531345061713,)",232153802.4960001
