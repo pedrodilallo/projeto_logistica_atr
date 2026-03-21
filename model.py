@@ -3,6 +3,7 @@ import pyomo.environ as pyo
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
 from pyomo.opt import TerminationCondition, SolverStatus
+from collections import defaultdict
 import numpy as np
 import os
 from datetime import datetime
@@ -42,81 +43,113 @@ class GLSP_model():
         model = self.model
 
         # Sets 
-        model.B = pyo.Set(initialize = instance.B, dimen = 1, ordered = True) # type: ignore
-        model.F = pyo.Set(initialize = instance.F , dimen = 1, ordered = True) # type: ignore
-        model.T = pyo.Set(initialize = instance.T , dimen = 1, ordered = True) # type: ignore
+        model.B = pyo.Set(initialize = instance.B, dimen = 1, ordered = True) 
+        model.F = pyo.Set(initialize = instance.F , dimen = 1, ordered = True) 
+        model.T = pyo.Set(initialize = instance.T , dimen = 1, ordered = True) 
         
-        model.S = pyo.RangeSet(1, instance.N * len(instance.T)) # type: ignore
-        model.S_t = pyo.Set(model.T, initialize=instance.S_t) # type: ignore
+        model.S = pyo.RangeSet(1, instance.N * len(instance.T)) 
+        model.S_t = pyo.Set(model.T, initialize=instance.S_t) 
         model.SO_t = pyo.Set(model.T,initialize=instance.SO_t)
             
-        model.V_J = pyo.Set(initialize=instance.V_J, ordered = False) # type: ignore
-        model.Bl_j = pyo.Set(model.F, initialize=instance.Bl_j,ordered = False) # type: ignore
-        model.Bs_j = pyo.Set(model.T, initialize=instance.Bs_j,ordered = False) # type: ignore
+        model.V_J = pyo.Set(initialize=instance.V_J, ordered = False) 
+        model.Bl_j = pyo.Set(model.F, initialize=instance.Bl_j,ordered = False) 
+        model.Bs_j = pyo.Set(model.T, initialize=instance.Bs_j,ordered = False) 
         
         # Params 
         model.fi_j = pyo.Param(model.B, initialize={j: instance.fi_j[j-1] for j in model.B}) #type: ignore
-        model.p_j = pyo.Param(model.B, initialize={j: instance.p_j[j-1] for j in model.B}) # type: ignore
-        #model.f_j = pyo.Param(model.B, initialize={j: instance.f_j[j-1] for j in model.B}) # type: ignore
-        model.TCH_j = pyo.Param(model.B, initialize={j: instance.TCH_j[j-1] for j in model.B}) # type: ignore
-        model.col_j = pyo.Param(model.B, initialize={j: instance.col_j[j-1] for j in model.B}) # type: ignore
-        model.transp_j = pyo.Param(model.B, initialize={j: instance.transp_j[j-1] for j in model.B}) # type: ignore
-        model.Nm_l = pyo.Param(model.F, initialize={l: instance.Nm_l[l-1] for l in model.F}) # type: ignore
-        model.mind_t = pyo.Param(model.T, initialize={t: instance.mind_t[t-1] for t in model.T}) # type: ignore
-        model.maxd_t = pyo.Param(model.T, initialize={t: instance.maxd_t[t-1] for t in model.T}) # type: ignore
-        model.vin_t = pyo.Param(model.T, initialize={t: instance.vin_t[t-1] for t in model.T}) # type: ignore
-        model.K_t = pyo.Param(model.T, initialize={t: instance.K_t[t-1] for t in model.T}) # type: ignore
-        model.st_ij = pyo.Param(model.B, model.B, initialize={(i, j): instance.st_ij[i-1, j-1] for i in model.B for j in model.B}) # type: ignore
-        model.dist_ij = pyo.Param(model.B, model.B, initialize={(i, j): instance.dist_ij[i-1, j-1] for i in model.B for j in model.B}) # type: ignore
-        model.ATR_jt = pyo.Param(model.B, model.T, initialize={(j, t): instance.ATR_jt[j-1, t-1] for j in model.B for t in model.T}) # type: ignore
-        model.bm_lj = pyo.Param(model.F, model.B, initialize={(l, j): instance.bm_lj[l][j-1] for l in model.F for j in model.B}) # type: ignore
-        model.Ht = pyo.Param(initialize=instance.Ht) # type: ignore
-        model.N_t = pyo.Param(model.T,initialize=instance.N_t) # type: ignore
-        model.Htt = pyo.Param(initialize=instance.Htt) # type: ignore
-        model.Np = pyo.Param(initialize=instance.Np) # type: ignore
-        model.mo = pyo.Param(initialize=instance.mo) # type: ignore
-        model.bs = pyo.Param(initialize=instance.bs) # type: ignore
-        model.md = pyo.Param(initialize=instance.md) # type: ignore
-        model.pa = pyo.Param(initialize=instance.pa) # type: ignore
+        model.p_j = pyo.Param(model.B, initialize={j: instance.p_j[j-1] for j in model.B}) 
+        #model.f_j = pyo.Param(model.B, initialize={j: instance.f_j[j-1] for j in model.B}) 
+        model.TCH_j = pyo.Param(model.B, initialize={j: instance.TCH_j[j-1] for j in model.B}) 
+        model.col_j = pyo.Param(model.B, initialize={j: instance.col_j[j-1] for j in model.B}) 
+        model.transp_j = pyo.Param(model.B, initialize={j: instance.transp_j[j-1] for j in model.B}) 
+        model.Nm_l = pyo.Param(model.F, initialize={l: instance.Nm_l[l-1] for l in model.F}) 
+        model.mind_t = pyo.Param(model.T, initialize={t: instance.mind_t[t-1] for t in model.T}) 
+        model.maxd_t = pyo.Param(model.T, initialize={t: instance.maxd_t[t-1] for t in model.T}) 
+        model.vin_t = pyo.Param(model.T, initialize={t: instance.vin_t[t-1] for t in model.T}) 
+        model.K_t = pyo.Param(model.T, initialize={t: instance.K_t[t-1] for t in model.T}) 
+        model.st_ij = pyo.Param(model.B, model.B, initialize={(i, j): instance.st_ij[i-1, j-1] for i in model.B for j in model.B}) 
+        model.dist_ij = pyo.Param(model.B, model.B, initialize={(i, j): instance.dist_ij[i-1, j-1] for i in model.B for j in model.B}) 
+        model.ATR_jt = pyo.Param(model.B, model.T, initialize={(j, t): instance.ATR_jt[j-1, t-1] for j in model.B for t in model.T}) 
+        model.bm_lj = pyo.Param(model.F, model.B, initialize={(l, j): instance.bm_lj[l][j-1] for l in model.F for j in model.B}) 
+        model.Ht = pyo.Param(initialize=instance.Ht) 
+        model.N_t = pyo.Param(model.T,initialize=instance.N_t) 
+        model.Htt = pyo.Param(initialize=instance.Htt) 
+        model.Np = pyo.Param(initialize=instance.Np) 
+        model.mo = pyo.Param(initialize=instance.mo) 
+        model.bs = pyo.Param(initialize=instance.bs) 
+        model.md = pyo.Param(initialize=instance.md) 
+        model.pa = pyo.Param(initialize=instance.pa) 
 
         self.model = model
 
-    def build_vars(self):
+    def build_vars(self,sparse = False):
         model = self.model
 
         def x_bounds(model,l, j,s):
             return (0, model.p_j[j])
         
-        model.x = pyo.Var(model.F, model.B, model.S, within=NonNegativeReals,bounds=x_bounds) # type: ignore
+        model.x = pyo.Var(model.F, model.B, model.S, within=NonNegativeReals,bounds=x_bounds) 
         
-        model.y = pyo.Var(model.F, model.B, model.S, within=Binary) # type: ignore
-        model.z = pyo.Var(model.F, model.B, model.B, model.S, within=Binary) # type: ignore
+        model.y = pyo.Var(model.F, model.B, model.S, within=Binary) 
 
         def wm_bounds(model, t):
             return (0, model.mind_t[t])
-        model.wm = Var(model.T,within=NonNegativeReals,bounds=wm_bounds) # type: ignore
+        model.wm = Var(model.T,within=NonNegativeReals,bounds=wm_bounds) 
 
         def wb_bounds(model, j):
             return (0, model.p_j[j])
-        model.wb = Var(model.B,within=NonNegativeReals,bounds = wb_bounds) # type: ignore
+        model.wb = Var(model.B,within=NonNegativeReals,bounds = wb_bounds) 
 
         # fi_jxando valores impossiveis de y
-        for j in model.B: # type: ignore
-            for t in model.T: # type: ignore
-                for l in model.F: # type: ignore
-                    if not j in set(value for value in model.Bs_j[t] if value in model.Bl_j[l]): # type: ignore
-                        for s in model.S_t[t]: # type: ignore
-                            model.y[l,j,s].fix(0) # type: ignore
+        fixed_y= set()
+        for j in model.B:
+            for t in model.T:
+                for l in model.F:
+                    if not j in set(value for value in model.Bs_j[t] if value in model.Bl_j[l]):
+                        for s in model.S_t[t]:
+                            model.y[l,j,s].fix(0)
+                            fixed_y.add((l, j, s))
+        
+        if not sparse:
+            model.z = pyo.Var(model.F,model.B,model.B,model.S, within=Binary)
+            self.model = model
+            
+            return
+
+        # (l,j) onde y[l,j,s] is NOT fixed to 0
+        active_lj_s: dict = {}
+        for l in model.F: 
+            for j in model.B: 
+                for s in model.S: 
+                    if (l, j, s) not in fixed_y:
+                        active_lj_s.setdefault(s, set()).add((l, j))
+        
+        valid_z = []
+        s_min = min(model.S) 
+        for s in model.S: 
+            active_j_s  = active_lj_s.get(s,   set())   # y(l,j,s) não fixado em s
+            active_i_s1 = active_lj_s.get(s-1, set())   # y(l,j,s) não fixado em s-1
+            for (l, j) in active_j_s:
+                if s == s_min:
+                    # No primeiro S, nada eh fixado
+                    for i in model.B: 
+                        valid_z.append((l, i, j, s))
+                else:
+                    for (l2, i) in active_i_s1:
+                        if l2 == l:
+                            valid_z.append((l, i, j, s))
+        
+        model.VALID_Z = pyo.Set(initialize=set(valid_z), dimen=4, ordered=False)
+        # só gera z quando y permite
+        model.z = pyo.Var(model.VALID_Z, within=Binary)
 
         self.model = model 
     
-    def build_model(self):
+    def build_model(self,sparse=False):
         model = self.model
         
-        # Objective 
-        model.objective = Objective(expr=(model.pa*sum(model.ATR_jt[j,t]*sum(model.x[l,j,s] for l in model.F for s in model.S_t[t]) for j in model.B for t in model.T) - (model.mo * sum(model.wm[t]  for t in model.T) + model.bs*sum(model.wb[j] for j in model.B) + model.md*sum(model.dist_ij[i, j] * model.z[l, i, j,s] for l in model.F for i in model.B for j in model.B for s in model.S))), sense=maximize)
-        print("OBJ OK")
-
+    
+        
         #2 & 3
         model.minimum_demand_list = ConstraintList()
         model.maximum_demand_list = ConstraintList()
@@ -137,13 +170,6 @@ class GLSP_model():
         for t in model.T:
             model.minimum_amount_of_vin_tasse_list.add(expr=(sum((model.x[l,j,s]/model.TCH_j[j])*model.fi_j[j] for s in model.S_t[t] for l in model.F for j in model.V_J) >= model.vin_t[t]))
         print("5 OK")
-
-        model.limit_harvesting_capacity_list = ConstraintList()
-        #6
-        for t in model.T:
-            for l in model.F:
-                model.limit_harvesting_capacity_list.add(expr=(sum(((24)/(model.col_j[j]*model.Nm_l[l]*model.Ht))*model.x[l,j,s] for s in model.S_t[t] for j in model.B) + sum((model.Nm_l[l]/model.Np)*model.st_ij[i,j]*model.z[l,i,j,s] for s in model.S_t[t] for j in model.B for i in model.B) <= model.K_t[t]))
-        print("6 OK")
 
         model.limit_transport_capacity_list = ConstraintList()
         #7        
@@ -186,44 +212,102 @@ class GLSP_model():
 
 
         model.consistent_movement_on_period_s_minus_list = ConstraintList()
-        #11
-        for s in model.S:
-            if s > 1:
+
+        if sparse:
+            model.objective = Objective(expr=(model.pa*sum(model.ATR_jt[j,t]*sum(model.x[l,j,s] for l in model.F for s in model.S_t[t]) for j in model.B for t in model.T) - (model.mo * sum(model.wm[t]  for t in model.T) + model.bs*sum(model.wb[j] for j in model.B) + model.md*sum(model.dist_ij[i, j] * model.z[l, i, j, s] for (l, i, j, s) in model.VALID_Z))), sense=maximize)
+            print("OBJ OK")
+
+
+            z_by_lt= defaultdict(list)   # (l, t) -> [(i, j, s), ...]
+            s_to_t = {s: t for t in model.T for s in model.S_t[t]}
+            for (l, i, j, s) in model.VALID_Z:
+                z_by_lt[(l, s_to_t[s])].append((i, j, s))
+
+            #6 - Só para z válido
+            for t in model.T:
                 for l in model.F:
-                    for i in model.B:
-                        model.consistent_movement_on_period_s_minus_list.add(expr=(sum(model.z[l,i,j,s] for j in model.B) == model.y[l,i,s-1]))
-        print("11 OK")
+                    z_entries = z_by_lt.get((l, t), [])
+                    model.limit_harvesting_capacity_list.add(expr=(sum(((24)/(model.col_j[j]*model.Nm_l[l]*model.Ht))*model.x[l,j,s] for s in model.S_t[t] for j in model.B) + sum((model.Nm_l[l]/model.Np)*model.st_ij[i,j]*model.z[l,i,j,s] for (i, j, s) in z_entries) <= model.K_t[t]))
+            print("6 OK")
+                    
+            z_by_lis = defaultdict(list)   # (l,i,s) -> [j, ...]
+            for (l, i, j, s) in model.VALID_Z: 
+                z_by_lis[(l, i, s)].append(j)
 
-        model.consistent_movement_on_period_s_list = ConstraintList()
-
-        #12
-        for s in model.S:
-            for l in model.F:
-                for j in model.B:
-                    model.consistent_movement_on_period_s_list.add(expr=(sum(model.z[l,i,j,s] for i in model.B) == model.y[l,j,s]))
-        print("12 OK")
-
-        model.idle_micro_period_list = ConstraintList()
-        #13
-        for t in model.T:
-            for s in [microperiod for microperiod in model.S_t[t] if microperiod != model.SO_t[t].at(1)]:
-                for j in model.B:
+            #11 - só gera para z válidos
+            for s in model.S:
+                if s > 1:
                     for l in model.F:
-                        model.idle_micro_period_list.add(expr=(model.y[l,j,s-1] >= model.y[l,j,s]))
+                        for i in model.B:
+                            js = z_by_lis.get((l, i, s), [])
+                            model.consistent_movement_on_period_s_minus_list.add(expr=(sum(model.z[l,i,j,s] for j in js) == model.y[l,i,s-1]))
+            print("11 OK")
 
-        print("13 OK")
+            model.consistent_movement_on_period_s_list = ConstraintList()
+            z_by_ljs = defaultdict(list)   # (l,j,s) -> [i, ...]
+            for (l, i, j, s) in model.VALID_Z: 
+                z_by_ljs[(l, j, s)].append(i)
 
-        self.model = model
+            #12 - só para z válido
+            for s in model.S:
+                for l in model.F:
+                    for j in model.B:
+                        i_list = z_by_ljs.get((l, j, s), [])
+                        model.consistent_movement_on_period_s_list.add(expr=(sum(model.z[l,i,j,s] for i in i_list) == model.y[l,j,s]))
+            print("12 OK")
 
-    def uncertainty(self,gamma: float,delta: float):
+            model.idle_micro_period_list = ConstraintList()
+            #13
+            for t in model.T:
+                for s in [microperiod for microperiod in model.S_t[t] if microperiod != model.SO_t[t].at(1)]:
+                    for j in model.B:
+                        for l in model.F:
+                            model.idle_micro_period_list.add(expr=(model.y[l,j,s-1] >= model.y[l,j,s]))
+
+            print("13 OK")
+
+            self.model = model
+        else:
+
+            # Objective 
+            model.objective = Objective(expr=(model.pa*sum(model.ATR_jt[j,t]*sum(model.x[l,j,s] for l in model.F for s in model.S_t[t]) for j in model.B for t in model.T) - (model.mo * sum(model.wm[t]  for t in model.T) + model.bs*sum(model.wb[j] for j in model.B) + model.md*sum(model.dist_ij[i, j] * model.z[l, i, j,s] for l in model.F for i in model.B for j in model.B for s in model.S))), sense=maximize)
+            print("OBJ OK")
+
+            model.limit_harvesting_capacity_list = ConstraintList()
+            for t in model.T:
+                for l in model.F:
+                    model.limit_harvesting_capacity_list.add(expr=(sum(((24)/(model.col_j[j]*model.Nm_l[l]*model.Ht))*model.x[l,j,s] for s in model.S_t[t] for j in model.B) + sum((model.Nm_l[l]/model.Np)*model.st_ij[i,j]*model.z[l,i,j,s] for s in model.S_t[t] for j in model.B for i in model.B) <= model.K_t[t]))
+            print("6 OK")
+
+            model.consistent_movement_on_period_s_minus_list = ConstraintList()
+
+            #1
+            for s in model.S:
+                if s > 1:
+                    for l in model.F:
+                        for i in model.B:
+                            model.consistent_movement_on_period_s_minus_list.add(expr=(sum(model.z[l,i,j,s] for j in model.B) == model.y[l,i,s-1]))
+            print("11 OK")
+
+            model.consistent_movement_on_period_s_list = ConstraintList()
+            #12
+            for s in model.S:
+                for l in model.F:
+                    for j in model.B:
+                        model.consistent_movement_on_period_s_list.add(expr=(sum(model.z[l,i,j,s] for i in model.B) == model.y[l,j,s]))
+
+            print("12 OK")
+            self.model = model
+
+    def uncertainty(self,gamma: float):
         self.gamma = gamma
-        self.theta = delta
+        self.theta = (0.147 - 0.095)
 
         Gamma = [np.ceil(gamma*len(self.model.Bs_j[t])) for t  in self.model.T] 
         ATR_deviation = np.zeros((len(self.model.B),len(self.model.T)))
         for j in self.model.B: 
             for t in self.model.T: 
-                ATR_deviation[j-1,t-1] = self.model.ATR_jt[j,t] * delta
+                ATR_deviation[j-1,t-1] = (0.147 - 0.095)
         
         return Gamma,ATR_deviation
     
@@ -341,23 +425,22 @@ class GLSP_model():
         if self.Robust:
             stats['theta'] = self.theta
             stats['gamma'] = self.gamma        
-        return (results,stats)
+        
 
-    def _compute_component_stats(self) -> dict:
-        model = self.model
+        milling_loss = sum(pyo.value(self.model.wm[t], exception=False) or 0.0 for t in self.model.T)
  
-        milling_loss = sum(pyo.value(model.wm[t], exception=False) or 0.0 for t in model.T)
+        standover = sum(pyo.value(self.model.wb[j], exception=False) or 0.0 for j in self.model.B)
  
-        standover = sum(pyo.value(model.wb[j], exception=False) or 0.0 for j in model.B)
+        total_distance = sum( pyo.value(self.model.dist_ij[i, j]) * (pyo.value(self.model.z[l, i, j, s], exception=False) or 0.0) for (l, i, j, s) in self.model.VALID_Z)
+         
+        revenue = pyo.value(self.model.pa) * sum( pyo.value(self.model.ATR_jt[j, t]) * sum(pyo.value(self.model.x[l, j, s], exception=False) or 0.0 for l in self.model.F for s in self.model.S_t[t]) for j in self.model.B for t in self.model.T)
  
-        total_distance = sum( pyo.value(model.dist_ij[i, j]) * (pyo.value(model.z[l, i, j, s], exception=False) or 0.0) for l in model.F for i in model.B for j in model.B for s in model.S)
- 
-        revenue = pyo.value(model.pa) * sum( pyo.value(model.ATR_jt[j, t]) * sum(pyo.value(model.x[l, j, s], exception=False) or 0.0 for l in model.F for s in model.S_t[t]) for j in model.B for t in model.T)
- 
-        return {'milling_loss_t':      milling_loss,
-            'standover_t':         standover,
-            'total_distance_km':   total_distance,
-            'atr_revenue':         revenue,}
+        stats['milling_loss_t'] =      milling_loss,
+        stats['standover_t'] =         standover,
+        stats['total_distance_km'] =   total_distance,
+        stats['atr_revenue'] =         revenue
+
+        return (results,stats)
     
     def append_to_master_csv(self, stats: dict, directory: str = "logs", filename: str = "all_results.csv"):
 

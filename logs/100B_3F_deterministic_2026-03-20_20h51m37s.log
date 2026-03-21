@@ -1,34 +1,6 @@
-100B_3F: 100 blocks, 1500051 tons
-75B: 75 blocks, 1110688 tons
-50B: 50 blocks, 747764 tons
-100B_3F: 100 blocks, 1500051 tons
-75B: 75 blocks, 1110688 tons
-50B: 50 blocks, 747764 tons
-Deterministic: 100B_3F  |  100 blocks
-Params ok!
-Vars ok!
-2 and 3 OK
-4 OK
-5 OK
-7 OK
-8 OK
-9 OK
-10 OK
-OBJ OK
-6 OK
-WARNING: Implicitly replacing the Component attribute
-consistent_movement_on_period_s_minus_list (type=<class
-'pyomo.core.base.constraint.ConstraintList'>) on block unknown with a new
-Component (type=<class 'pyomo.core.base.constraint.ConstraintList'>). This is
-usually indicative of a modelling error. To avoid this warning, use
-block.del_component() and block.add_component().
-11 OK
-12 OK
-Model was built!
-Set parameter Username
-Academic license - for non-commercial use only - expires 2027-03-19
-Set parameter TimeLimit to value 3600
-Set parameter SoftMemLimit to value 12
+
+Gurobi 13.0.1 (linux64) logging started Fri Mar 20 20:52:06 2026
+
 Set parameter LogFile to value "logs/100B_3F_deterministic_2026-03-20_20h51m37s.log"
 Set parameter Threads to value 1
 Gurobi Optimizer version 13.0.1 build v13.0.1rc0 (linux64 - "Linux Mint 22")
