@@ -212,7 +212,6 @@ class GLSP_model():
         print("10 OK")
 
 
-        model.consistent_movement_on_period_s_minus_list = ConstraintList()
 
         if self.sparse:
             model.objective = Objective(expr=(model.pa*sum(model.ATR_jt[j,t]*sum(model.x[l,j,s] for l in model.F for s in model.S_t[t]) for j in model.B for t in model.T) - (model.mo * sum(model.wm[t]  for t in model.T) + model.bs*sum(model.wb[j] for j in model.B) + model.md*sum(model.dist_ij[i, j] * model.z[l, i, j, s] for (l, i, j, s) in model.VALID_Z))), sense=maximize)
@@ -235,6 +234,7 @@ class GLSP_model():
             for (l, i, j, s) in model.VALID_Z: 
                 z_by_lis[(l, i, s)].append(j)
 
+            model.consistent_movement_on_period_s_minus_list = ConstraintList()
             #11 - só gera para z válidos
             for s in model.S:
                 if s > 1:
@@ -282,7 +282,7 @@ class GLSP_model():
 
             model.consistent_movement_on_period_s_minus_list = ConstraintList()
 
-            #1
+            #11
             for s in model.S:
                 if s > 1:
                     for l in model.F:
@@ -373,13 +373,13 @@ class GLSP_model():
         
         return [row(idx, vd) for idx, vd in var_obj.items()]
 
-    def save_variables_to_csv(self):
-        os.makedirs("model_variables_csv", exist_ok=True)
+    def save_variables_to_csv(self,directory = 'model_variables_csv'):
+        os.makedirs(directory, exist_ok=True)
         
         stem = (os.path.basename(self._run_stem)
                 if self._run_stem else self.instance.Name)
         
-        path = os.path.join('model_variables_csv', stem + ".csv")
+        path = os.path.join(directory, stem + ".csv")
 
         rows = [r for v in self.model.component_objects(pyo.Var, active=True) for r in self._var_rows(v)]
         pd.DataFrame(rows, columns=["variable_name", "i", "j", "l", "s", "t", "value"]).to_csv(path, index=False)
@@ -396,6 +396,8 @@ class GLSP_model():
         solver.options['TimeLimit'] = TimeLim  
         solver.options['SoftMemLimit'] = MemLim
         solver.options['LogFile'] = run_stem + ".log"
+        solver.options['MIPGap'] = 0.005
+        solver.options['OptimalityTol'] = 5e-3
         solver.set_instance(self.model) 
 
         results = solver.solve(self.model, tee=True, load_solutions = False)

@@ -1,0 +1,37 @@
+
+Gurobi 13.0.1 (linux64) logging started Sun Mar 22 08:44:31 2026
+
+Set parameter LogFile to value "logs/100B_6F_robust_gamma_-1_theta_0d05199999999999999_2026-03-22_08h42m40s.log"
+Set parameter MIPGap to value 0.005
+Set parameter OptimalityTol to value 0.005
+Gurobi Optimizer version 13.0.1 build v13.0.1rc0 (linux64 - "openSUSE Tumbleweed")
+
+CPU model: Intel(R) Core(TM) i7-10610U CPU @ 1.80GHz, instruction set [SSE2|AVX|AVX2]
+Thread count: 4 physical cores, 8 logical processors, using up to 8 threads
+
+Non-default parameters:
+TimeLimit  3600
+SoftMemLimit  12
+MIPGap  0.005
+OptimalityTol  0.005
+
+Optimize a model with 119300 rows, 3061121 columns and 9210625 nonzeros (Max)
+Model fingerprint: 0x1e0dbc1d
+Model has 2970111 linear objective coefficients
+Variable types: 31121 continuous, 3030000 integer (3030000 binary)
+Coefficient statistics:
+  Matrix range     [3e-05, 1e+05]
+  Objective range  [1e+00, 3e+03]
+  Bounds range     [1e+00, 1e+05]
+  RHS range        [1e+00, 1e+05]
+
+Presolve removed 0 rows and 1010 columns
+Presolve time: 0.67s
+
+Explored 0 nodes (0 simplex iterations) in 1.24 seconds (1.04 work units)
+Thread count was 1 (of 8 available processors)
+
+Solution count 0
+
+Model is infeasible or unbounded
+Best objective -, best bound -, gap -

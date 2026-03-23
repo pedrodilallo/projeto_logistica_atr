@@ -56,24 +56,11 @@ os.makedirs("model_variables_csv", exist_ok=True)
 inst_100_3F, inst_75_3F,inst_50_3F, inst_100_6F, inst_75_6F,inst_50_6F = generate_hierarchy()
 
 BASE_INSTANCES = [inst_50_3F,inst_50_6F,inst_75_3F,inst_75_6F,inst_100_3F,inst_100_6F]
-
-for base_instance in BASE_INSTANCES:
-    print(f"Deterministic: {base_instance.Name}  |  {len(base_instance.B)} blocks")
-    inst = copy(base_instance)
-    inst.Name = f"{base_instance.Name}_deterministic"
- 
-    model = GLSP_model(inst)
-    results, stats = model.solve(TimeLim=3600, logfile=f"logs/{inst.Name}")
- 
-    print(stats)
-    model.save_variables_to_csv()
-    model.append_to_master_csv(stats, directory='logs', filename='all_results.csv')
-
 for base_instance in BASE_INSTANCES:
     print(f"\n{'='*60}")
     print(f"Robust base: {base_instance.Name}  |  {len(base_instance.B)} blocks")
  
-    for gamma in [0.25, 0.5, 0.75,-1]:
+    for gamma in [1]:
 
         inst = copy(base_instance)
         run_tag = f"gamma_{gamma}_theta_{0.147 - 0.095}".replace('.', 'd')
@@ -96,6 +83,6 @@ for base_instance in BASE_INSTANCES:
             logfile=f"logs/{inst.Name}")
 
         print(stats)
-        model.save_variables_to_csv()
-        model.append_to_master_csv(stats, directory='logs', filename='all_results.csv')
+        model.save_variables_to_csv(directory='model_variables_csv_fast')
+        model.append_to_master_csv(stats, directory='logs_fast', filename='all_results.csv')
 
