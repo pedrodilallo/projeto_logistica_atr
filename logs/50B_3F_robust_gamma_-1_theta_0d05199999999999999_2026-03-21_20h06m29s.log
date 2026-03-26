@@ -1,0 +1,35 @@
+
+Gurobi 13.0.1 (linux64) logging started Sat Mar 21 20:06:35 2026
+
+Set parameter LogFile to value "logs/50B_3F_robust_gamma_-1_theta_0d05199999999999999_2026-03-21_20h06m29s.log"
+Gurobi Optimizer version 13.0.1 build v13.0.1rc0 (linux64 - "Linux Mint 22")
+
+CPU model: 12th Gen Intel(R) Core(TM) i7-12700, instruction set [SSE2|AVX|AVX2]
+Thread count: 20 physical cores, 20 logical processors, using up to 20 threads
+
+Non-default parameters:
+TimeLimit  3600
+SoftMemLimit  12
+
+Optimize a model with 29970 rows, 390571 columns and 1191423 nonzeros (Max)
+Model fingerprint: 0xb3a95dce
+Model has 367561 linear objective coefficients
+Variable types: 8071 continuous, 382500 integer (382500 binary)
+Coefficient statistics:
+  Matrix range     [3e-05, 1e+05]
+  Objective range  [1e+00, 3e+03]
+  Bounds range     [1e+00, 1e+05]
+  RHS range        [8e-03, 1e+05]
+
+Found heuristic solution: objective 1.000000e+30
+Presolve removed 0 rows and 510 columns
+Presolve time: 0.03s
+
+Explored 0 nodes (0 simplex iterations) in 0.07 seconds (0.12 work units)
+Thread count was 1 (of 20 available processors)
+
+Solution count 2: 1e+30 1e+30 
+No other solutions better than 0
+
+Model is unbounded
+Best objective 1.000000000000e+30, best bound -, gap -
