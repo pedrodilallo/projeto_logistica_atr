@@ -235,6 +235,7 @@ class GLSP_model():
             for (l, i, j, s) in model.VALID_Z: 
                 z_by_lis[(l, i, s)].append(j)
 
+            model.consistent_movement_on_period_s_minus_list = ConstraintList()
             #11 - só gera para z válidos
             for s in model.S:
                 if s > 1:
@@ -282,7 +283,7 @@ class GLSP_model():
 
             model.consistent_movement_on_period_s_minus_list = ConstraintList()
 
-            #1
+            #11
             for s in model.S:
                 if s > 1:
                     for l in model.F:
@@ -372,13 +373,13 @@ class GLSP_model():
         
         return [row(idx, vd) for idx, vd in var_obj.items()]
 
-    def save_variables_to_csv(self,save_dir='model_variables_csv'):
-        os.makedirs(f"{save_dir}", exist_ok=True)
+    def save_variables_to_csv(self,directory = 'model_variables_csv'):
+        os.makedirs(directory, exist_ok=True)
         
         stem = (os.path.basename(self._run_stem)
                 if self._run_stem else self.instance.Name)
         
-        path = os.path.join(f'{save_dir}', stem + ".csv")
+        path = os.path.join(directory, stem + ".csv")
 
         rows = [r for v in self.model.component_objects(pyo.Var, active=True) for r in self._var_rows(v)]
         pd.DataFrame(rows, columns=["variable_name", "i", "j", "l", "s", "t", "value"]).to_csv(path, index=False)
