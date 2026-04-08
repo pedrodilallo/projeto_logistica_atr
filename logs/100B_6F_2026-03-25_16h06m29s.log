@@ -1,0 +1,5 @@
+
+Gurobi 13.0.1 (linux64) logging started Wed Mar 25 16:07:27 2026
+
+Set parameter LogFile to value "logs/100B_6F_2026-03-25_16h06m29s.log"
+Set parameter MIPGap to value 0.05

@@ -218,6 +218,7 @@ class GLSP_model():
             print("OBJ OK")
 
 
+            model.consistent_movement_on_period_s_minus_list = ConstraintList()
             z_by_lt= defaultdict(list)   # (l, t) -> [(i, j, s), ...]
             s_to_t = {s: t for t in model.T for s in model.S_t[t]}
             for (l, i, j, s) in model.VALID_Z:
@@ -308,7 +309,7 @@ class GLSP_model():
         ATR_deviation = np.zeros((len(self.model.B),len(self.model.T)))
         for j in self.model.B: 
             for t in self.model.T: 
-                ATR_deviation[j-1,t-1] = (0.147 - 0.095)
+                ATR_deviation[j-1,t-1] = round(0.147 - 0.095,3)
         
         return Gamma,ATR_deviation
     
@@ -330,22 +331,21 @@ class GLSP_model():
         model.beta = pyo.Var(model.B, model.T, within=NonNegativeReals )
         theta,alpha,beta = model.theta, model.alpha, model.beta
 
-
         model.del_component(model.objective)
-        model.objective = Objective(expr=  theta - (\
-            mo*sum(wm[t] for t in T) + \
-            bs*sum(wb[j] for j in B) + \
-            md*sum(dist_ij[i, j] * z[l, i, j,s] for l in F for i in B for j in B for t in T for s in S_t[t])), sense=maximize)
-
+        if not self.sparse: 
+            model.objective = Objective(expr=  theta - (\
+                mo*sum(wm[t] for t in T) + \
+                bs*sum(wb[j] for j in B) + \
+                md*sum(dist_ij[i, j] * z[l, i, j,s] for l in F for i in B for j in B for t in T for s in S_t[t])), sense=maximize)
+        else: 
+            model.objective = Objective(expr=  theta - (\
+                mo*sum(wm[t] for t in T) + \
+                bs*sum(wb[j] for j in B) + \
+                md*sum(dist_ij[i, j] * z[l, i, j,s] for (l, i, j, s) in model.VALID_Z)), sense=maximize)
         model.obj_revenue = ConstraintList()
 
         if max(Gamma) == 0:
             raise ValueError ('LOAD DETERMINISC MODEL')
-        
-        elif max(Gamma) == -1:
-            # WORST-CASE (SOYSTER)
-            print("WORST-CASE (SOYSTER)")
-            model.obj_revenue.add(expr=( theta == pa*sum( (self.model.ATR_jt[j,t] - ATR_deviation[j,t]) * sum(x[l,j,s] for l in F for s in S_t[t]) for j in B for t in T) ))
 
         elif max(Gamma) > 0:
             # ROBUST
@@ -397,7 +397,7 @@ class GLSP_model():
         solver.options['SoftMemLimit'] = MemLim
         solver.options['LogFile'] = run_stem + ".log"
         solver.options['MIPGap'] = 0.005
-        solver.options['OptimalityTol'] = 5e-3
+        solver.options['OptimalityTol'] = 0.005
         solver.set_instance(self.model) 
 
         results = solver.solve(self.model, tee=True, load_solutions = False)
